@@ -1,0 +1,110 @@
+### Testing
+
+Fake Products Testing: Run Products Service Test
+npx jest src/modules/products/products.service.spec.ts
+npx jest src/modules/products/products.controller.spec.ts
+
+Run a single test 
+
+Testing Fundamentals
+│
+├── What is testing?
+├── Types of testing
+├── Jest basics
+│
+Unit Testing
+│
+├── Service tests
+├── Controller tests
+├── Utility tests
+├── Pipe tests
+├── Guard tests
+├── Interceptor tests
+├── Filter tests
+├── Decorator tests
+│
+Mocking
+│
+├── Mock services
+├── Mock repositories
+├── Mock Prisma/Drizzle
+├── Mock HTTP requests
+├── Mock JWT
+├── Mock Dates
+├── Mock Environment Variables
+│
+Integration Testing
+│
+├── Nest TestingModule
+├── In-memory database
+├── Test containers
+├── Supertest
+│
+E2E Testing
+│
+├── Login flow
+├── Protected routes
+├── File uploads
+├── Authentication
+│
+Coverage
+│
+├── Code coverage
+├── CI/CD
+└── GitHub Actions
+
+
+### Integration Testing
+npx jest test/integration/users.integration.spec.ts
+
+
+### E2E
+Part 1 – E2E Infrastructure
+    test/setup/app.e2e.ts
+    test/setup/mongodb.ts
+    test/setup/jest.setup.ts
+    test/setup/test-module.ts
+    jest-e2e.json
+    package.json scripts
+
+Part 2 – Fixtures
+    employer.fixture.ts
+    jobseeker.fixture.ts
+    job.fixture.ts
+    application.fixture.ts
+
+Part 3 – Authentication Helpers
+    auth.helper.ts
+    login
+    register employer
+    register job seeker
+    refresh token
+    logout
+    createAuthenticatedEmployer
+    createAuthenticatedJobSeeker
+
+Part 4 – Jobs Helpers
+    createJob
+    updateJob
+    deleteJob
+    toggleClose
+    getEmployerJobs
+
+Part 5 – Applications Helpers
+Part 6 – Saved Jobs Helpers
+Part 7 – Complete jobs.e2e-spec.ts
+Part 8 – Complete auth.e2e-spec.ts
+Part 9 – Complete applications.e2e-spec.ts
+Part 10 – Complete saved-jobs.e2e-spec.ts
+Part 11 – Complete users.e2e-spec.ts
+
+Og: jest-e2e.json File
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  }
+}

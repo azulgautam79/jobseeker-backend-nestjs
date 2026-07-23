@@ -1,0 +1,10 @@
+groups:
+  - name: jobseeker_alerts
+
+    rules:
+      - alert: BackendDown
+        expr: up{job="nestjs"} == 0
+        for: 1m
+
+        annotations:
+          summary: Backend service is down

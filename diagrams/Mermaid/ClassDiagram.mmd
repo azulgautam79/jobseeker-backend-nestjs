@@ -1,0 +1,42 @@
+classDiagram
+    class users {
+        +ObjectId _id
+        +string companyName
+        +string email
+        +string password
+        +string refreshToken
+        +string resume
+    }
+
+    class jobs {
+        +ObjectId _id
+        +ObjectId company
+        +string location
+        +string title
+    }
+
+    class applications {
+        +ObjectId _id
+        +ObjectId applicant
+        +ObjectId job
+        +string status
+    }
+
+    class savedjobs {
+        +ObjectId _id
+        +string job
+        +ObjectId jobseeker
+    }
+
+    class otps {
+        +ObjectId _id
+        +date expiresAt
+        +string otp
+    }
+
+    users "1" --> "0..*" jobs : company posts jobs
+    users "1" --> "0..*" applications : user applies for jobs
+    jobs "1" --> "0..*" applications : job receives applications
+    users "1" --> "0..*" savedjobs : user saves jobs
+    jobs "1" --> "0..*" savedjobs : job is saved by users
+    users "1" --> "0..*" otps : user has OTPs

@@ -1,0 +1,31 @@
+@startuml
+title Job Seeker - State Diagram
+
+skinparam dpi 180
+skinparam shadowing false
+
+[*] --> Draft
+
+Draft --> Submitted : Submit Application
+
+Submitted --> UnderReview : Employer Reviews
+
+UnderReview --> Shortlisted : Shortlist Candidate
+UnderReview --> Rejected : Reject Application
+
+Shortlisted --> InterviewScheduled : Schedule Interview
+InterviewScheduled --> InterviewCompleted : Complete Interview
+
+InterviewCompleted --> Offered : Select Candidate
+InterviewCompleted --> Rejected : Reject Candidate
+
+Offered --> Accepted : Candidate Accepts
+Offered --> Declined : Candidate Declines
+
+Accepted --> Hired : Employer Confirms Hiring
+
+Rejected --> [*]
+Declined --> [*]
+Hired --> [*]
+
+@enduml

@@ -1,0 +1,119 @@
+Launch EC2 from cmd 
+1. ssh -i "C:\Users\Legion\.ssh\keypair.pem" ec2-user@43.205.210.4
+
+2. Create a file
+ nano install_amazon_docker.sh Ctrl+O enter and Ctrl+X
+chmod +x install_amazon_docker.sh
+./install_amazon_docker.sh
+
+
+install_amazon_docker.sh has code from 3.1_Docker_Initialization
+
+[Logout with "exit" and login again to check to see if it works without sudo]
+
+3. Check docker version
+docker --version
+
+4. Make cli directory for docker compose and plugins
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+
+5. Download docker compose
+sudo curl -SL https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
+
+6. Make that executable
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+7. Check to see if docker compose is installed or not
+docker compose version
+
+8. Install git
+sudo dnf install -y git
+
+9. Clone the repo if public
+	git clone https://github.com/lemongautam79/devops_2025.git app_name
+	no username or password
+      If private i you have to enter username and password
+
+10. Create .env in server folder
+cd app
+nano server/.env
+Copy and paste your .env from server 
+
+11. Add .dockerignore inside server and client
+
+12. Add the new instance deployment backend url to vite env wala and push your repo and pull inside your aws instance cmd 
+git pull
+
+13.  Build containers from the docker-compose
+docker compose build
+
+14.  Run the containers
+docker compose up -d
+
+15. View the running containers
+docker compose ps
+
+16. View logs from the docker containers
+docker compose logs
+
+
+
+
+Dockerfile: How an image is built eg: 
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+RUN npm run build
+
+CMD ["node", "dist/main.js"]
+
+.dockerignore: What files must be ignored before building a docker image
+node_modules
+dist
+.env
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+
+docker-compose.yml: How containers run together
+Which images
+How many containers
+Ports
+Volumes
+Networks
+Environment variables
+
+[Private github repo]
+1. On EC2 instance run
+ssh-keygen -t ed25519 -C "ec2-github-deploy"
+to create private and public ssh keys
+
+2. Add these deploy key to github repo
+cat ~/.ssh/id_ed25519.pub
+
+Github->Repo->Settings->Deploy Keys-> Add Deploy Keys-> Paste key and Save
+
+3. Now change such that your app inside instance uses shh instead of http to clone
+cd app
+git remote -v
+
+if https://github.com/.. change to
+git remote set-url origin git@github.com:USERNAME/REPO.git
+
+and git pull to test
+
+
+
+
+
+
+
+
+

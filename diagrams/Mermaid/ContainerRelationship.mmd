@@ -1,0 +1,23 @@
+## Container Architecture
+
+```mermaid
+graph TD
+
+    nginx --> backend
+
+    backend --> mongodb[(MongoDB Atlas)]
+    backend --> redis[(Upstash Redis)]
+
+    backend --> prometheus
+    backend --> tempo
+    backend --> alloy
+
+    alloy --> loki
+
+    prometheus --> grafana
+    loki --> grafana
+    tempo --> grafana
+
+    nodeexporter --> prometheus
+    cadvisor --> prometheus
+```

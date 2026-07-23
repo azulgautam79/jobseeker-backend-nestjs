@@ -1,0 +1,108 @@
+@startuml
+title Job Seeker - Component Diagram
+
+left to right direction
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam dpi 180
+skinparam linetype ortho
+
+actor "Job Seeker" as JS
+actor "Employer" as EMP
+' actor "Admin" as ADM
+
+package "Frontend (ReactJS)" {
+
+    component "Authentication UI" as AuthUI
+    component "Profile UI" as ProfileUI
+    component "Job UI" as JobUI
+    component "Application UI" as AppUI
+    component "Dashboard UI" as DashboardUI
+    ' component "Notification UI" as NotificationUI
+}
+
+package "Backend (NestJS)" {
+
+    component "API Controllers" as API
+
+    component "Authentication\nModule" as AUTH
+    component "User\nModule" as USER
+    component "Job\nModule" as JOB
+    component "Application\nModule" as APP
+    component "Recommendation\nModule" as REC
+    ' component "Notification\nModule" as NOTI
+    ' component "Admin\nModule" as ADMIN
+    component "Email\nModule" as EMAIL
+    component "File Upload\nModule" as FILE
+}
+
+database "MongoDB Atlas" as DB
+
+' cloud "Cloudinary" as CLOUD
+cloud "SMTP Server" as SMTP
+
+'---------------- Actors ----------------
+
+JS --> AuthUI
+JS --> ProfileUI
+JS --> JobUI
+JS --> AppUI
+JS --> DashboardUI
+' JS --> NotificationUI
+
+EMP --> AuthUI
+EMP --> DashboardUI
+EMP --> JobUI
+EMP --> AppUI
+' EMP --> NotificationUI
+
+' ADM --> DashboardUI
+
+'---------------- Frontend ----------------
+
+AuthUI --> API
+ProfileUI --> API
+JobUI --> API
+AppUI --> API
+DashboardUI --> API
+' NotificationUI --> API
+
+'---------------- API ----------------
+
+API --> AUTH
+API --> USER
+API --> JOB
+API --> APP
+API --> REC
+' API --> NOTI
+' API --> ADMIN
+API --> EMAIL
+API --> FILE
+
+'---------------- Internal ----------------
+
+AUTH --> USER
+
+APP --> JOB
+APP --> USER
+APP --> REC
+' APP --> NOTI
+
+JOB --> REC
+
+' NOTI --> EMAIL
+
+' FILE --> CLOUD
+EMAIL --> SMTP
+
+'---------------- Database ----------------
+
+AUTH --> DB
+USER --> DB
+JOB --> DB
+APP --> DB
+REC --> DB
+' NOTI --> DB
+' ADMIN --> DB
+
+@enduml

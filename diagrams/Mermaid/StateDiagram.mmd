@@ -1,0 +1,19 @@
+---
+id: a2818296-9fe1-4c99-9b3e-3404e7eb92dd
+---
+
+stateDiagram-v2
+    [*] --> Register
+    Register --> Verify_Email
+    Verify_Email --> Login
+    Login --> Complete_Profile 
+    Complete_Profile --> Browse_Jobs
+    Browse_Jobs --> Save_Job
+    Browse_Jobs --> Apply_Job
+    Apply_Job --> Submit_Application
+    Save_Job --> Apply_Job
+    Submit_Application --> Accepted
+    Submit_Application --> Rejected
+    Accepted --> Offer
+    Rejected --> [*]
+    Offer --> [*]

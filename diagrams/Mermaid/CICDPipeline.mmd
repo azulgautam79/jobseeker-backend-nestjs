@@ -1,0 +1,20 @@
+## CI/CD Pipeline
+
+```mermaid
+flowchart LR
+
+    Dev[Developer Push] --> Github[GitHub Repository]
+
+    Github --> CI[GitHub Actions CI]
+
+    CI --> Lint[Lint]
+    Lint --> Build[Build Docker Image]
+    Build --> Push[Push Image to GHCR]
+
+    Push --> CD[GitHub Actions CD]
+
+    CD --> SSH[SSH to EC2]
+
+    SSH --> Pull[docker compose pull backend]
+    Pull --> Deploy[docker compose up -d backend]
+```

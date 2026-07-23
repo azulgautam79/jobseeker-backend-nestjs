@@ -1,0 +1,58 @@
+sequenceDiagram
+    autonumber
+    actor User as User / Job Seeker
+    participant FE as Frontend
+    participant BE as Backend
+    participant DB as Database
+    participant NS as Notification System
+
+    User->>FE: Open portal
+    FE->>BE: Request job listings
+    BE->>DB: Fetch jobs, companies, filters
+    DB-->>BE: Job data
+    BE-->>FE: Return job listings
+    FE-->>User: Show searchable job list
+
+    User->>FE: Search / filter / sort jobs
+    FE->>BE: Send search criteria
+    BE->>DB: Query matching jobs
+    DB-->>BE: Matching results
+        actor User as Job Seeker
+        participant FE as Frontend
+        participant BE as Backend
+        participant DB as Database
+        participant NS as Notification System
+
+        User->>FE: Open portal
+        FE->>BE: Request available jobs
+        BE->>DB: Fetch jobs and company data
+        DB-->>BE: Job list
+        BE-->>FE: Return job list
+        FE-->>User: Display jobs
+
+        User->>FE: Search, filter, or sort jobs
+        FE->>BE: Send search criteria
+        BE->>DB: Query matching jobs
+        DB-->>BE: Matching results
+        BE-->>FE: Return filtered jobs
+        FE-->>User: Show results
+
+        User->>FE: View job details and apply
+        FE->>BE: Submit application and resume
+        BE->>DB: Save application
+        DB-->>BE: Application stored
+        BE->>NS: Send confirmation email
+        NS-->>User: Application confirmation
+        BE-->>FE: Application submitted
+        FE-->>User: Show success message
+
+        User->>FE: Save job to wishlist
+        FE->>BE: Store saved job
+        BE->>DB: Save wishlist item
+        DB-->>BE: Saved successfully
+        BE-->>FE: Wishlist updated
+        FE-->>User: Confirm saved job
+
+        Note over BE,NS: Employer can update status or schedule interviews
+        BE->>NS: Send status update or interview email
+        NS-->>User: Notification email

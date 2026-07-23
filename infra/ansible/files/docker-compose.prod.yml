@@ -1,0 +1,217 @@
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  backend:
+    image: ghcr.io/lemongautam79/jobseeker-backend:latest
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    expose:
+      - "7000"
+    networks:
+      - backend
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+    expose:
+      - "9090"
+    networks:
+      - monitoring
+    logging: *default-logging
+
+  # alertmanager:
+  #   image: prom/alertmanager:v0.28.1
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+  #     - ./monitoring/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+  #   command:
+  #     - "--config.file=/etc/alertmanager/alertmanager.yml"
+  #   ports:
+  #     - "9093:9093"
+  #   networks:
+  #     - monitoring
+  #   logging: *default-logging
+  #   healthcheck:
+  #     test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/healthy"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 5
+
+  grafana:
+    image: grafana/grafana:12.2.0
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - grafana_plugins:/var/lib/grafana/plugins
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    expose:
+      - "3000"
+    env_file:
+      - .env.production
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  loki:
+    image: grafana/loki:2.9.13
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+    command:
+      - "-config.file=/etc/loki/config.yml"
+    expose:
+      - "3100"
+    networks:
+      - monitoring
+    logging: *default-logging
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  alloy:
+    image: grafana/alloy:v1.8.3
+    restart: unless-stopped
+    command:
+      - run
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      # Read Docker logs
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persist positions
+      - alloy_data:/var/lib/alloy
+    depends_on:
+      - loki
+    networks:
+      - monitoring
+    logging: *default-logging
+
+  tempo:
+    image: grafana/tempo:2.9.2
+    user: "0:0"
+    restart: unless-stopped
+    command:
+      - "-config.file=/etc/tempo.yaml"
+    volumes:
+      - ./monitoring/tempo/tempo.yml:/etc/tempo.yaml:ro
+      - tempo_data:/tmp/tempo 
+    expose:
+      - "3200"   # HTTP
+      - "4317"   # gRPC OTLP
+      - "4318"   # OLTP HTTP
+    networks:
+      - monitoring
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3200/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    restart: unless-stopped
+    expose:
+      - "9100"
+    networks:
+      - monitoring
+    logging: *default-logging
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.2
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    networks:
+      - monitoring
+    logging: *default-logging
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+      - grafana
+    networks:
+      - backend
+      - monitoring
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+
+networks:
+  monitoring:
+    driver: bridge
+  backend:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  grafana_plugins:
+  loki_data:
+  tempo_data:
+  alloy_data:

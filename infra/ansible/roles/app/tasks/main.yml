@@ -1,0 +1,53 @@
+---
+- name: Create application directory
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Remove old nginx config directory
+  file:
+    path: "{{ app_dir }}/nginx/conf.d"
+    state: absent
+
+- name: Create nginx directories
+  file:
+    path: "{{ app_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - nginx
+    - nginx/conf.d
+    - certbot
+    - certbot/conf
+    - certbot/www
+
+- name: Copy docker compose file
+  copy:
+    src: "{{ playbook_dir }}/files/docker-compose.prod.yml"
+    dest: "{{ app_dir }}/docker-compose.yml"
+    mode: "0644"
+  notify: Restart application
+
+- name: Copy environment file
+  copy:
+    src: "{{ playbook_dir }}/files/.env.production"
+    dest: "{{ app_dir }}/.env.production"
+    owner: ubuntu
+    group: ubuntu
+    mode: "0600"
+  notify: Restart application
+
+- name: Copy nginx configs
+  copy:
+    src: "{{ playbook_dir }}/files/nginx/conf.d/"
+    dest: "{{ app_dir }}/nginx/conf.d/"
+
+- name: Pull latest images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ app_dir }}"
+
+- name: Start application stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}"
+    state: present

@@ -1,0 +1,66 @@
+@startuml
+title Job Seeker - Activity Diagram
+
+start
+
+:Open Job Seeker;
+
+if (Logged in?) then (No)
+    :Register / Login;
+endif
+
+:Browse Job Listings;
+
+:Search / Filter Jobs;
+
+:View Job Details;
+
+if (Interested?) then (Yes)
+
+    :Upload Resume;
+    :Fill Application Form;
+    :Submit Application;
+
+    ' :Validate Application;
+
+    if (Valid?) then (Yes)
+        ' :Store Application in Database;
+        ' :Send Confirmation Notification;
+        :Application Submitted Successfully;
+    else (No)
+        :Display Validation Errors;
+    endif
+
+else (No)
+    :Continue Browsing Jobs;
+endif
+
+:Employer Reviews Application;
+
+if (Shortlisted?) then (Yes)
+
+    :Schedule Interview;
+    :Notify Job Seeker;
+
+    ' if (Selected?) then (Yes)
+    '     :Send Job Offer;
+
+    '     if (Offer Accepted?) then (Yes)
+    '         :Mark Candidate as Hired;
+    '     else (No)
+    '         :Close Application;
+    '     endif
+
+    ' else (No)
+    '     :Reject Application;
+    '     :Notify Job Seeker;
+    ' endif
+
+else (No)
+    :Reject Application;
+    :Notify Job Seeker;
+endif
+
+stop
+
+@enduml

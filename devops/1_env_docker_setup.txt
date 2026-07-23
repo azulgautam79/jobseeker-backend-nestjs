@@ -1,0 +1,54 @@
+1. Create .env file and add db_uri, port, etc for both backend and frontend
+
+client/.env
+VITE_API_URL=http://localhost:5000/api
+
+server/.env
+PORT=5000
+MONGO_URI=
+
+2. Add .env to gitignore to prevent the .env from being pushed to github
+
+Docker Setup
+    Server Side
+3. Create a Dockerfile
+        FROM node:20-alpine
+
+        # Create app directory
+        WORKDIR /app
+
+        # Install dependencies first (better caching)
+        COPY package*.json ./
+
+        RUN npm install
+
+        # Copy source code
+        COPY . .
+
+        # Build NestJS app
+        RUN npm run build
+
+        # Expose app port
+        EXPOSE 7000
+
+        # Run compiled app
+        CMD ["node", "dist/main.js"]
+
+4. Build docker image and run the containers
+    [go to the server folder] then execute these commands
+
+    docker build -t jobseeker-backend .
+    docker run -p 7000:7000 --name nestjs-backend jobseeker-backend
+
+    docker run -p 7000:7000 --name nestjs-backend --env-file .env jobseeker-backend
+
+    [go to the frontend folder] then execute these commands
+    
+    docker build -t jobseeker-frontend .
+   
+    docker run -p 5173:5173 --name nestjs-frontend --env-file .env jobseeker-frontend
+
+5. Using Docker compose to run multi containers from single yaml file
+
+    docker-compose up --build
+

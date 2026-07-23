@@ -1,0 +1,52 @@
+
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Project files
+devops
+diagrams
+help.txt
+vercel.json
+dashboard.json
+
+# environment
+.env
+.env.*
+!.env.example
+
+# monitoring
+docker-compose.yml
+monitoring
+nginx
+tempo
+infra
+
+# git & config
+.git
+.github
+.gitignore
+.vscode
+
+# build artifacts (handled inside Docker)
+dist
+coverage
+
+# tests & docs
+test
+documentation
+diagrams
+help.txt
+
+# local uploads (optional – depends on your app)
+uploads
+dashboard.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# logs
+logs

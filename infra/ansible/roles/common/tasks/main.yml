@@ -1,0 +1,18 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: true
+
+- name: Upgrade installed packages
+  apt:
+    upgrade: dist
+
+- name: Install common packages
+  apt:
+    name:
+      - curl
+      - wget
+      - git
+      - unzip
+      - htop
+    state: present

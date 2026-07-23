@@ -1,0 +1,157 @@
+groups:
+
+  # - name: test
+
+  #   rules:
+  #     - alert: TestAlert
+
+  #       expr: vector(1)
+
+  #       for: 10s
+
+  #       labels:
+  #         severity: info
+
+  #       annotations:
+  #         summary: Test Alert
+
+  #         description: Alertmanager is working correctly.
+
+  - name: infrastructure
+
+    rules:
+
+      #
+      # Node Exporter
+      #
+
+      - alert: NodeDown
+        expr: up{job="node"} == 0
+        for: 2m
+
+        labels:
+          severity: critical
+          service: infrastructure
+
+        annotations:
+          summary: Node Exporter is down
+          description: "{{ $labels.instance }} has not been reachable for 2 minutes."
+
+      #
+      # Prometheus
+      #
+
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 2m
+
+        labels:
+          severity: critical
+
+        annotations:
+          summary: Prometheus is down
+          description: Prometheus cannot scrape itself.
+
+      #
+      # cAdvisor
+      #
+
+      - alert: CAdvisorDown
+        expr: up{job="cadvisor"} == 0
+        for: 2m
+
+        labels:
+          severity: critical
+
+        annotations:
+          summary: cAdvisor is down
+          description: Docker container metrics are unavailable.
+
+      - alert: HighCPUUsage
+
+        expr: 100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+
+        for: 5m
+
+        labels:
+          severity: warning
+          service: infrastructure
+
+        annotations:
+          summary: High CPU usage
+          description: CPU usage has exceeded 80% for more than 5 minutes.
+
+      - alert: HighMemoryUsage
+
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+
+        for: 5m
+
+        labels:
+          severity: warning
+          service: infrastructure
+
+        annotations:
+          summary: High memory usage
+          description: Memory usage is above 85%.
+
+      - alert: DiskSpaceLow
+
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 < 15
+
+        for: 5m
+
+        labels:
+          severity: critical
+          service: infrastructure
+
+        annotations:
+          summary: Low disk space
+          description: Less than 15% disk space is available.
+
+  - name: nestjs
+
+    rules:
+
+      - alert: NestJSDown
+
+        expr: up{job="nestjs"} == 0
+
+        for: 1m
+
+        labels:
+          severity: critical
+          service: backend
+
+        annotations:
+          summary: NestJS backend is down
+          description: Prometheus cannot reach the backend service.
+
+      # - alert: HighRequestLatency
+
+      #   expr: histogram_quantile(
+      #           0.95,
+      #           sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+      #         ) > 1
+
+      #   for: 5m
+
+      #   labels:
+      #     severity: warning
+
+      #   annotations:
+      #     summary: High API latency
+      #     description: 95% of requests are taking longer than one second.
+
+      # - alert: HighErrorRate
+
+      #   expr: rate(http_requests_total{status=~"5.."}[5m]) > 5
+
+      #   for: 2m
+
+      #   labels:
+      #     severity: warning
+
+      #   annotations:
+      #     summary: High HTTP 5xx error rate
+      #     description: More than five server errors per second.

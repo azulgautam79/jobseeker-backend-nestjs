@@ -1,0 +1,77 @@
+@startuml
+title Job Seeker - Deployment Diagram
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam dpi 180
+
+node "Client Device" {
+    node "Web Browser" {
+        artifact "ReactJS Frontend"
+    }
+}
+
+cloud "Internet"
+
+node "Vercel" {
+    artifact "React Application"
+}
+
+node "Vercel Cloud" {
+
+    node "NestJS Server" {
+
+        component "REST API"
+
+        component "Authentication Module"
+
+        component "Job Module"
+
+        component "Application Module"
+
+        component "Recommendation Engine"
+
+        ' component "Notification Module\n(Server Sent Events)"
+
+        component "Email Service"
+
+    }
+
+}
+
+database "MongoDB Atlas" {
+    artifact "JobSeeker Database"
+}
+
+' cloud "Cloudinary" {
+'     artifact "Images & Resumes"
+' }
+
+' Client Connections
+"Web Browser" --> "React Application" : HTTPS
+
+' Frontend to Backend
+"React Application" --> "REST API" : HTTPS (JSON API)
+
+' Real-time notifications
+' "Web Browser" <-- "Notification Module\n(Server Sent Events)" : SSE
+
+' Backend Modules
+"REST API" --> "Authentication Module"
+"REST API" --> "Job Module"
+"REST API" --> "Application Module"
+"REST API" --> "Recommendation Engine"
+"REST API" --> "Email Service"
+
+' Database Access
+"Authentication Module" --> "JobSeeker Database"
+"Job Module" --> "JobSeeker Database"
+"Application Module" --> "JobSeeker Database"
+"Recommendation Engine" --> "JobSeeker Database"
+' "Notification Module\n(Server Sent Events)" --> "JobSeeker Database"
+
+' External Services
+' "REST API" --> "Images & Resumes" : Upload/Retrieve Files
+"Email Service" --> "Email Service" : OTP & Notifications
+
+@enduml

@@ -1,0 +1,80 @@
+@startuml
+title Job Seeker - Use Case Diagram
+
+left to right direction
+skinparam shadowing false
+skinparam dpi 180
+
+actor "Job Seeker" as JS
+actor "Employer" as EMP
+' actor "Admin" as ADM
+
+rectangle "Job Seeker" {
+
+    usecase "Register" as UC1
+    usecase "Login" as UC2
+    usecase "Manage Profile" as UC3
+    usecase "Search Jobs" as UC4
+    usecase "Filter Jobs" as UC5
+    usecase "View Job Details" as UC6
+    usecase "Apply for Job" as UC7
+    usecase "Upload Resume" as UC8
+    usecase "Save Job" as UC9
+    usecase "View Application Status" as UC10
+    usecase "Receive Notifications" as UC11
+
+    usecase "Post Job" as UC12
+    usecase "Manage Jobs" as UC13
+    usecase "View Applications" as UC14
+    ' usecase "Shortlist Candidates" as UC15
+    usecase "Update Application Status" as UC16
+    ' usecase "Schedule Interview" as UC17
+
+    usecase "Manage Users" as UC18
+    usecase "Manage Job Listings" as UC19
+    ' usecase "Manage Categories" as UC20
+    ' usecase "View Reports" as UC21
+}
+
+'-------------------------
+' Job Seeker
+'-------------------------
+
+JS --> UC1
+JS --> UC2
+JS --> UC3
+JS --> UC4
+JS --> UC5
+JS --> UC6
+JS --> UC7
+JS --> UC9
+JS --> UC10
+JS --> UC11
+
+UC7 .> UC8 : <<include>>
+
+'-------------------------
+' Employer
+'-------------------------
+
+EMP --> UC2
+EMP --> UC3
+EMP --> UC12
+EMP --> UC13
+EMP --> UC14
+EMP --> UC16
+EMP --> UC11
+' EMP --> UC15
+' EMP --> UC17
+
+'-------------------------
+' Admin
+'-------------------------
+
+' ADM --> UC2
+' ADM --> UC18
+' ADM --> UC19
+' ADM --> UC20
+' ADM --> UC21
+
+@enduml

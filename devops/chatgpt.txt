@@ -1,0 +1,6 @@
+
+1. Build Dockerfile
+2. Build .dockerignore
+3. Build dockercompose.yml
+4. Run the compose
+    docker compose up -d --build

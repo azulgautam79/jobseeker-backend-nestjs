@@ -1,0 +1,74 @@
+@startuml
+title Job Seeker - Sequence Diagram
+
+autonumber
+
+actor "Job Seeker" as User
+participant "Frontend" as FE
+participant "Backend (NestJS)" as BE
+database "MongoDB" as DB
+participant "Notification Service" as NS
+
+== Browse Jobs ==
+
+User ->> FE: Open portal
+FE ->> BE: Request available jobs
+BE ->> DB: Fetch jobs and company data
+DB -->> BE: Job list
+BE -->> FE: Return job list
+FE -->> User: Display jobs
+
+== Search Jobs ==
+
+User ->> FE: Search / Filter / Sort jobs
+FE ->> BE: Send search criteria
+BE ->> DB: Query matching jobs
+DB -->> BE: Matching jobs
+BE -->> FE: Return filtered jobs
+FE -->> User: Show search results
+
+== View Job ==
+
+User ->> FE: View job details
+FE ->> BE: Request job details
+BE ->> DB: Fetch job information
+DB -->> BE: Job details
+BE -->> FE: Return job details
+FE -->> User: Display job information
+
+== Apply for Job ==
+
+User ->> FE: Submit application & resume
+FE ->> BE: Send application
+BE ->> DB: Save application
+DB -->> BE: Application saved
+
+BE ->> NS: Send application confirmation
+NS -->> User: Confirmation notification
+
+BE -->> FE: Application submitted
+FE -->> User: Show success message
+
+== Save Job ==
+
+User ->> FE: Save job
+FE ->> BE: Save wishlist item
+BE ->> DB: Store saved job
+DB -->> BE: Saved successfully
+BE -->> FE: Wishlist updated
+FE -->> User: Saved confirmation
+
+== Employer Updates Status ==
+
+Note over BE,NS
+Employer reviews the application,
+updates status, or schedules an interview.
+end note
+
+BE ->> DB: Update application status
+DB -->> BE: Status updated
+
+BE ->> NS: Send status/interview notification
+NS -->> User: Status update email/SSE notification
+
+@enduml

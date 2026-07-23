@@ -1,0 +1,6 @@
+---
+app_name: jobseeker
+app_dir: /opt/jobseeker
+
+compose_file: docker-compose.prod.yml
+env_file: .env.production

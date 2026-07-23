@@ -1,0 +1,24 @@
+## High-Level Architecture
+
+```mermaid
+flowchart TD
+
+    User[Users] -->|HTTPS| FE[Vercel Frontend]
+    FE -->|REST API| Nginx[Nginx Reverse Proxy]
+    Nginx --> Backend[NestJS Backend]
+
+    Backend --> Mongo[(MongoDB Atlas)]
+    Backend --> Redis[(Upstash Redis)]
+
+    Backend --> OTEL[OpenTelemetry SDK]
+
+    OTEL --> Tempo[Tempo Traces]
+    Backend --> Prometheus[Prometheus Metrics]
+    Backend --> Alloy[Alloy Log Collector]
+
+    Alloy --> Loki[Loki Logs]
+
+    Prometheus --> Grafana[Grafana Dashboard]
+    Loki --> Grafana
+    Tempo --> Grafana
+```

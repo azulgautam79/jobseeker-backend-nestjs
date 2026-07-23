@@ -1,0 +1,31 @@
+## Request Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    actor User
+    participant Frontend
+    participant Nginx
+    participant Backend
+    participant MongoDB
+    participant Redis
+
+    User->>Frontend: Search Jobs
+    Frontend->>Nginx: GET /jobs
+    Nginx->>Backend: Forward Request
+
+    Backend->>Redis: Check Cache
+
+    alt Cache Hit
+        Redis-->>Backend: Cached Jobs
+    else Cache Miss
+        Backend->>MongoDB: Query Jobs
+        MongoDB-->>Backend: Jobs
+        Backend->>Redis: Store Cache
+    end
+
+    Backend-->>Nginx: Response
+    Nginx-->>Frontend: JSON Response
+    Frontend-->>User: Display Jobs
+```

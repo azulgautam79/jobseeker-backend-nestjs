@@ -1,0 +1,20 @@
+## Observability Architecture
+
+```mermaid
+flowchart LR
+
+    Backend[NestJS Backend]
+
+    Backend -->|Metrics| Prometheus
+    Backend -->|Traces| Tempo
+    Backend -->|Logs| Alloy
+
+    Alloy --> Loki
+
+    Prometheus --> Grafana
+    Tempo --> Grafana
+    Loki --> Grafana
+
+    NodeExporter --> Prometheus
+    cAdvisor --> Prometheus
+```

@@ -1,0 +1,17 @@
+1. Install packages for linting, testing etc 
+    In client: React (Vite)
+    npm i -D eslint prettier @eslint/js globals eslint-plugin-react-hooks eslint-plugin-react-refresh
+
+    In server: NestJS
+    npm i -D eslint prettier
+
+2. Add scripts in package.json
+    "scripts":{
+        "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+        "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
+        "format": "prettier --write .",
+    }
+
+3. Add eslint.config.js if not available already for lint rules, files that it lints etc.
+
+4. 

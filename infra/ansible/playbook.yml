@@ -1,0 +1,9 @@
+---
+- hosts: aws
+  become: true
+
+  roles:
+    - common
+    - docker
+    - monitoring
+    - app

@@ -1,0 +1,150 @@
+@startuml
+title Job Seeker - Class Diagram
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam dpi 180
+left to right direction
+
+'========================
+' User
+'========================
+class User {
+    +id: ObjectId
+    +name: String
+    +email: String
+    +password: String
+    +role: Role
+    +avatar: String
+    +isVerified: Boolean
+    +status: UserStatus
+}
+
+class JobSeeker {
+    +skills: List<String>
+    ' +education: String
+    +experience: String
+    +resume: String
+    ' +expectedSalary: Double
+}
+
+class Employer {
+    +companyName: String
+    +companyDescription: String
+    ' +website: String
+    +location: String
+}
+
+User <|-- JobSeeker
+User <|-- Employer
+
+'========================
+' Job
+'========================
+class Job {
+    +id: ObjectId
+    +title: String
+    +description: String
+    +category: String
+    +location: String
+    +jobType: String
+    +salary: Double
+    +skills: List<String>
+    ' +deadline: Date
+    +status: JobStatus
+}
+
+'========================
+' Job Application
+'========================
+class JobApplication {
+    +id: ObjectId
+    ' +coverLetter: String
+    +status: ApplicationStatus
+    +appliedAt: Date
+}
+
+'========================
+' Notification
+'========================
+' class Notification {
+'     +id: ObjectId
+'     +title: String
+'     +message: String
+'     +isRead: Boolean
+'     +createdAt: Date
+' }
+
+'========================
+' Review
+'========================
+' class Review {
+'     +id: ObjectId
+'     +rating: Integer
+'     +comment: String
+'     +createdAt: Date
+' }
+
+'========================
+' Recommendation Engine
+'========================
+class RecommendationEngine {
+    +recommendJobs()
+    +calculateSimilarity()
+}
+
+'========================
+' Authentication
+'========================
+class AuthService {
+    +register()
+    +login()
+    +verifyEmail()
+    +refreshToken()
+    +forgotPassword()
+}
+
+'========================
+' Email Service
+'========================
+class EmailService {
+    +sendOTP()
+    +sendVerification()
+    +sendApplicationStatus()
+}
+
+'========================
+' Notification Service
+'========================
+' class NotificationService {
+'     +createNotification()
+'     +sendSSE()
+'     +markAsRead()
+' }
+
+'========================
+' Relationships
+'========================
+
+' Employer "1" --> "0..*" Job : posts
+
+' JobSeeker "1" --> "0..*" JobApplication : submits
+
+' Job "1" --> "0..*" JobApplication : receives
+
+' JobApplication --> Job
+' JobApplication --> JobSeeker
+
+' User "1" --> "0..*" Notification
+
+' Employer "1" --> "0..*" Review
+' JobSeeker "1" --> "0..*" Review
+
+' RecommendationEngine ..> Job
+' RecommendationEngine ..> JobSeeker
+
+' AuthService ..> User
+' EmailService ..> User
+' NotificationService ..> Notification
+
+@enduml
