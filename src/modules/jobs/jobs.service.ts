@@ -25,12 +25,15 @@ import { CacheKeys } from '../../common/cache/cache.keys';
 import { CacheTTL } from '../../common/cache/cache.ttl';
 import { JobCacheService } from './job-cache.service';
 import { PinoLogger } from 'nestjs-pino';
+import { ConfigService } from '@nestjs/config';
 
 /**
  *! Job Service
  */
 @Injectable()
 export class JobsService {
+  private readonly recommendationThreshold: number;
+
   //! DI
   constructor(
     @InjectModel(Job.name) private jobModel: Model<JobDocument>,
@@ -38,11 +41,15 @@ export class JobsService {
     @InjectModel(SavedJob.name) private savedJobModel: Model<SavedJobDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
 
+    private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly jobCacheService: JobCacheService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(JobsService.name);
+    this.recommendationThreshold = Number(
+      this.configService.getOrThrow('RECOMMENDATION_THRESHOLD'),
+    );
   }
 
   //! Find All Jobs Ko Values haru
@@ -174,7 +181,7 @@ export class JobsService {
 
         recommendationScore,
 
-        isRecommended: recommendationScore >= 0.4,
+        isRecommended: recommendationScore >= this.recommendationThreshold,
       };
     });
   }

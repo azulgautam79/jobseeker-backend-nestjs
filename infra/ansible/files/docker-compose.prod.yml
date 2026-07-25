@@ -8,7 +8,7 @@ x-logging: &default-logging
 services:
 
   backend:
-    image: ghcr.io/lemongautam79/jobseeker-backend:latest
+    image: ghcr.io/azulgautam79/jobseeker-backend:latest
     restart: unless-stopped
     env_file:
       - .env.production

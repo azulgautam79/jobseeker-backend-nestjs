@@ -1,9 +1,10 @@
+//! Mongo SRV Error
+import dns from 'node:dns'; 
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { LoggerMiddleware } from './common/middlewares/morgan_logger/logger.middleware';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { ApplicationsModule } from './modules/applications/applications.module';
@@ -29,6 +30,11 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { HealthModule } from './common/health/health.module';
 import { randomUUID } from 'crypto';
 import { context, trace } from '@opentelemetry/api';
+import { TraceModule } from './common/telemetry/tracing/trace.module';
+
+// Force public DNS
+dns.setServers(['1.1.1.1', '8.8.8.8']);
+
 @Module({
   imports: [
     //! Config Module
@@ -172,6 +178,9 @@ import { context, trace } from '@opentelemetry/api';
 
     //! Application Logging (Services, Controllers and Filters etc)
     AppLoggerModule,
+
+    //! Tracing
+    TraceModule,
   ],
   controllers: [AppController],
   providers: [

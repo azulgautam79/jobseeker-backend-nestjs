@@ -8,11 +8,16 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
+import { LoggerService } from '../../common/logger/logger.service';
 
 @Injectable()
 export class TestService {
   private getRandomValue<T>(arr: T[]): T {
     return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext(TestService.name);
   }
 
   private throwRandomHttpError(): never {
@@ -43,15 +48,20 @@ export class TestService {
 
   //! Slow endpoint that simulates a heavy task and randomly throws HTTP errors
   async slow() {
-    const tracer = trace.getTracer('nestjs-service');
-    const span = tracer.startSpan('slowEndpoint');
-    const timeTaken = await this.doSomeHeavyTask();
+    const tracer = trace.getTracer('test-service');
 
-    span.end();
-    return {
-      status: 'Success',
-      message: `Task completed in ${timeTaken} ms`,
-    };
+    const timeTaken = await this.doSomeHeavyTask();
+    return tracer.startActiveSpan('test.slow', (span) => {
+      try {
+        this.logger.info('Slow endpoint started');
+        return {
+          status: 'Success',
+          message: `Task completed in ${timeTaken} ms`,
+        };
+      } finally {
+        span.end();
+      }
+    });
   }
 
   //! Fast endpoint that randomly throws HTTP errors without delay

@@ -87,7 +87,7 @@ services:
     ports:
       - '3001:3000'
     env_file:
-      - .env.production
+      - .env.development.local
     networks:
       - monitoring
     depends_on:
