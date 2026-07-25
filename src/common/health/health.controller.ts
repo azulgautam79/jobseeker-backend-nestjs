@@ -39,7 +39,7 @@ export class HealthController {
       span.setAttribute('health.endpoint', '/health');
       span.setAttribute('health.type', 'readiness');
 
-      const result = await this.health.check([
+      const result = await this.health.check([  
         () =>
           this.mongoose.pingCheck('mongodb', {
             connection: this.connection,
