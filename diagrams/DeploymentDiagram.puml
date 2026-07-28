@@ -43,9 +43,9 @@ database "MongoDB Atlas" {
     artifact "JobSeeker Database"
 }
 
-' cloud "Cloudinary" {
-'     artifact "Images & Resumes"
-' }
+cloud "Cloudinary" {
+    artifact "Images & Resumes"
+}
 
 ' Client Connections
 "Web Browser" --> "React Application" : HTTPS
@@ -71,7 +71,7 @@ database "MongoDB Atlas" {
 ' "Notification Module\n(Server Sent Events)" --> "JobSeeker Database"
 
 ' External Services
-' "REST API" --> "Images & Resumes" : Upload/Retrieve Files
+"REST API" --> "Images & Resumes" : Upload/Retrieve Files
 "Email Service" --> "Email Service" : OTP & Notifications
 
 @enduml

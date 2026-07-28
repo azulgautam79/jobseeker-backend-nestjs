@@ -38,7 +38,7 @@ package "Backend (NestJS)" {
 
 database "MongoDB Atlas" as DB
 
-' cloud "Cloudinary" as CLOUD
+cloud "Cloudinary" as CLOUD
 cloud "SMTP Server" as SMTP
 
 '---------------- Actors ----------------
@@ -86,13 +86,14 @@ AUTH --> USER
 APP --> JOB
 APP --> USER
 APP --> REC
-' APP --> NOTI
 
 JOB --> REC
 
 ' NOTI --> EMAIL
 
-' FILE --> CLOUD
+'---------------- External Services ----------------
+
+FILE --> CLOUD
 EMAIL --> SMTP
 
 '---------------- Database ----------------
@@ -102,7 +103,5 @@ USER --> DB
 JOB --> DB
 APP --> DB
 REC --> DB
-' NOTI --> DB
-' ADMIN --> DB
 
 @enduml

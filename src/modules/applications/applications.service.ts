@@ -12,6 +12,10 @@ import { Job, JobDocument } from '../jobs/schemas/job.schema';
 import { ApplicationStatus } from '../../common/enums/applicationStatus';
 import { MailService } from '../mail/mail.service';
 import { calculateRecommendationScore } from '../../common/utils/calculateRecommendationScore';
+import { RedisService } from '../redis/redis.service';
+import { CacheKeys } from '../../common/cache/cache.keys';
+import { CacheTTL } from '../../common/cache/cache.ttl';
+import { JobCacheService } from '../jobs/job-cache.service';
 
 /**
  *! Job Application Service
@@ -24,7 +28,8 @@ export class ApplicationsService {
     private applicationModel: Model<ApplicationDocument>,
     @InjectModel(Job.name) private jobModel: Model<JobDocument>,
     private readonly mailService: MailService,
-  ) {}
+    private readonly redisService: RedisService,
+  ) { }
 
   /**
    *! Apply to Job
@@ -54,6 +59,11 @@ export class ApplicationsService {
       applicant: new Types.ObjectId(user._id),
       resume,
     });
+
+    // Invalidate employer's cached jobs
+    await this.redisService.del(
+      CacheKeys.employerJobs(job.company.toString()),
+    );
 
     return application;
   }
