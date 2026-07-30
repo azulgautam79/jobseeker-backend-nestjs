@@ -18,11 +18,12 @@ dashboard.json
 !.env.example
 
 # monitoring
-docker-compose.yml
+docker-compose*.yml
 monitoring
 nginx
 tempo
 infra
+Docker*
 
 # git & config
 .git
