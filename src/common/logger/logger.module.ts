@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
-import { LoggerService } from './logger.service';
+import { LoggerFactory } from './logger.factory';
+import { TraceModule } from '../telemetry/tracing/trace.module';
 
 @Module({
-  providers: [LoggerService],
-  exports: [LoggerService],
+  imports: [TraceModule],
+  providers: [LoggerFactory],
+  exports: [LoggerFactory],
 })
 export class AppLoggerModule {}

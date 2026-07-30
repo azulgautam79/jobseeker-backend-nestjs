@@ -8,12 +8,23 @@ import {
 import { Request, Response } from 'express';
 import * as path from 'path';
 
-import { LoggerService } from '../logger/logger.service';
 import { AppException } from '../exceptions/app.exceptions';
+import { ContextLogger } from '../logger/context-logger';
+import { LoggerFactory } from '../logger/logger.factory';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  constructor(private readonly logger: LoggerService) {}
+
+  // private readonly logger: ContextLogger;
+
+  // constructor(
+  //   loggerFactory: LoggerFactory,
+  //   {
+  //     this.logger =
+  //     loggerFactory.create(
+  //       HealthService.name,
+  //     );
+  //   }
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -72,9 +83,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     };
 
     if (statusCode >= 500) {
-      this.logger.error(message, exception, logContext);
+      // this.logger.error(message, exception, logContext);
     } else {
-      this.logger.warn(message, logContext);
+      // this.logger.warn(message, logContext);
     }
 
     if (isDevelopment) {

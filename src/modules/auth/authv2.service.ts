@@ -9,7 +9,6 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'crypto';
 import { RegisterDto } from './dto/register.dto';
-import { AuthResponseDto } from './dto/auth-response.dto';
 import { UsersService } from '../users/users.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from '../users/schemas/user.schema';
@@ -22,7 +21,10 @@ import { Otp } from './schemas/otp.schema';
 import { MailService } from '../mail/mail.service';
 import { VerifyEmailDto } from './dto/verifyEmail.dto';
 import ms from 'ms';
-import { LoggerService } from '../../common/logger/logger.service';
+import { ContextLogger } from '../../common/logger/context-logger';
+import { LoggerFactory } from '../../common/logger/logger.factory';
+import { Trace } from '../../common/telemetry/tracing/trace.decorator';
+import { TraceService } from '../../common/telemetry/tracing/trace.service';
 
 type OtpType = 'VERIFY_EMAIL' | 'FORGOT_PASSWORD';
 /**
@@ -31,6 +33,7 @@ type OtpType = 'VERIFY_EMAIL' | 'FORGOT_PASSWORD';
 @Injectable()
 export class AuthV2Service {
   private readonly SALT_ROUNDS = 10;
+  private readonly logger: ContextLogger;
 
   //! Dependency Injection
   constructor(
@@ -40,9 +43,13 @@ export class AuthV2Service {
     private usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
-    private readonly logger: LoggerService,
+    private readonly traceService: TraceService,
+    loggerFactory: LoggerFactory,
   ) {
-    this.logger.setContext(AuthV2Service.name);
+    this.logger =
+      loggerFactory.create(
+        AuthV2Service.name,
+      );
   }
 
   //? Generate access and response tokens
@@ -112,6 +119,7 @@ export class AuthV2Service {
   /**
    *! Refresh access token
    */
+  @Trace('authv2.refresh-token')
   async refreshTokens(refreshToken: string) {
     const payload = await this.jwtService.verifyAsync(refreshToken);
 
@@ -153,6 +161,7 @@ export class AuthV2Service {
   /**
    *! Register a new user
    */
+  @Trace('authv2.register')
   async register(registerDto: RegisterDto): Promise<{ message: string }> {
     const { name, email, password, role } = registerDto;
 
@@ -258,6 +267,7 @@ export class AuthV2Service {
   /**
    *! Verify Email
    */
+  @Trace('authv2.verify-email')
   async verifyEmail(dto: VerifyEmailDto): Promise<{ message: string }> {
     const { email, otp } = dto;
 
@@ -377,33 +387,81 @@ export class AuthV2Service {
   /**
    *! Login User
    */
+  @Trace('authv2.login')
   async login(loginDto: LoginDto) {
     const { email, password, rememberMe } = loginDto;
 
+    this.logger.info('Login request received', {
+      email,
+      rememberMe,
+    });
+
+    this.traceService.setCurrentAttributes({
+      'auth.email': email,
+      'auth.remember_me': rememberMe,
+    });
+
     const refreshExpiresAt = rememberMe
       ? new Date(
-          Date.now() +
-            Number(
-              ms(this.configService.getOrThrow('REFRESH_TOKEN_REMEMBER_TIME')),
-            ),
-        )
+        Date.now() +
+        Number(
+          ms(this.configService.getOrThrow('REFRESH_TOKEN_REMEMBER_TIME')),
+        ),
+      )
       : new Date(
-          Date.now() +
-            Number(ms(this.configService.getOrThrow('REFRESH_TOKEN_TIME'))),
-        );
+        Date.now() +
+        Number(ms(this.configService.getOrThrow('REFRESH_TOKEN_TIME'))),
+      );
 
     const user = await this.usersService.findByEmail(email);
 
-    if (
-      !user ||
-      !(await bcrypt.compare(password.trim(), user.password.trim()))
-    ) {
-      throw new UnauthorizedException('Invalid email or password');
+    if (!user) {
+      this.logger.warn('Login failed - user not found', { email });
+
+      this.traceService.addCurrentEvent('User not found');
+
+      throw new UnauthorizedException(
+        'Invalid email or password',
+      );
+    }
+
+    const validPassword = await bcrypt.compare(
+      password.trim(),
+      user.password.trim(),
+    );
+
+    if (!validPassword) {
+      this.logger.warn('Login failed - invalid password', {
+        userId: user.id,
+      });
+
+      this.traceService.addCurrentEvent(
+        'Invalid password',
+      );
+
+      throw new UnauthorizedException(
+        'Invalid email or password',
+      );
     }
 
     if (!user.isEmailVerified) {
+      this.logger.warn(
+        'Login failed - email not verified',
+        {
+          userId: user.id,
+        },
+      );
+
+      this.traceService.addCurrentEvent(
+        'Email not verified',
+      );
       throw new UnauthorizedException('Please verify your email first');
     }
+
+    this.traceService.setCurrentAttributes({
+      'user.id': user.id,
+      'user.role': user.role,
+    });
 
     const tokens = await this.generateTokens(
       user.id,
@@ -411,13 +469,22 @@ export class AuthV2Service {
       user.role,
       rememberMe,
     );
+
+    this.traceService.addCurrentEvent(
+      'JWT tokens generated',
+    );
+
     await this.updateRefreshToken(
       user.id,
       tokens.refreshToken,
       refreshExpiresAt,
     );
 
-    this.logger.info('User logged in', {
+    this.traceService.addCurrentEvent(
+      'Refresh token updated',
+    );
+
+    this.logger.info('User logged in successfully', {
       userId: user.id,
       email: user.email,
     });
@@ -432,6 +499,7 @@ export class AuthV2Service {
   /**
    *! Forgot password
    */
+  @Trace('authv2.forgot-password')
   async forgotPassword(email: string): Promise<{ message: string }> {
     const user = await this.UserModel.findOne({ email });
 
@@ -490,6 +558,7 @@ export class AuthV2Service {
   /**
    *! Verify Otp
    */
+  @Trace('authv2.verify-otp')
   async verifyOtp(
     email: string,
     otp: string,
@@ -517,6 +586,7 @@ export class AuthV2Service {
   /**
    *! Resend Otp
    */
+  @Trace('authv2.resend-otp')
   async resendOtp(
     email: string,
     type: 'VERIFY_EMAIL' | 'FORGOT_PASSWORD',
@@ -580,6 +650,7 @@ export class AuthV2Service {
   /**
    *! Reset Password
    */
+  @Trace('authv2.reset-password')
   async resetPassword(
     email: string,
     newPassword: string,
@@ -601,6 +672,7 @@ export class AuthV2Service {
   /**
    *! Logout User
    */
+  @Trace('authv2.logout')
   async logout(userId: string): Promise<void> {
     await this.UserModel.updateOne(
       { _id: userId },
