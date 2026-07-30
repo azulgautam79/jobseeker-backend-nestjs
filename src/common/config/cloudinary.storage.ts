@@ -1,6 +1,12 @@
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import cloudinary from './cloudinary.config';
 
+const sanitizePublicId = (name: string, suffix: string) =>
+  `${name}-${suffix}`
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9-_]/g, '');
+
 export const avatarStorage = new CloudinaryStorage({
   cloudinary,
 
@@ -9,7 +15,7 @@ export const avatarStorage = new CloudinaryStorage({
 
     allowed_formats: ['jpg', 'jpeg', 'png'],
 
-    public_id: `${req.user.name}-avatar`,
+    public_id: sanitizePublicId(req.user.name, 'avatar'),
 
     overwrite: true,
     invalidate: true,
@@ -24,7 +30,7 @@ export const companyLogosStorage = new CloudinaryStorage({
 
     allowed_formats: ['jpg', 'jpeg', 'png'],
 
-    public_id: `${req.user.name}-company-logo`,
+    public_id: sanitizePublicId(req.user.name, 'company-logo'),
 
     overwrite: true,
     invalidate: true,
@@ -41,7 +47,10 @@ export const resumeStorage = new CloudinaryStorage({
 
     allowed_formats: ['pdf'],
 
-    public_id: `${req.user.name}-resume`,
+    public_id: `${req.user.name}-resume`
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-zA-Z0-9-_]/g, '') + '.pdf',
 
     overwrite: true,
     invalidate: true,

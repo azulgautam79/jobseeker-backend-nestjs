@@ -5,30 +5,64 @@ x-logging: &default-logging
     max-file: '3'
 
 services:
+  # backend:
+  #   image: jobseeker-backend:latest
+
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+
+  #   restart: unless-stopped
+
+  #   env_file:
+  #     - .env.development.local
+
+  #   # expose:
+  #   #   - "7000"
+
+  #   ports:
+  #     - '7000:7000'
+
+  #   networks:
+  #     - backend
+  #     - monitoring
+
+  #   healthcheck:
+  #     test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:7000/api/health']
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 90s
+
+  #   logging: *default-logging
+
   backend:
-    image: jobseeker-backend:latest
+    image: jobseeker-backend:dev
 
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
+
+    command: npm run start:dev
 
     restart: unless-stopped
 
     env_file:
       - .env.development.local
 
-    # expose:
-    #   - "7000"
-
     ports:
-      - '7000:7000'
+      - "7000:7000"
+
+    volumes:
+      - .:/app
+      - backend_node_modules:/app/node_modules
 
     networks:
       - backend
       - monitoring
 
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:7000/api/health']
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -221,3 +255,4 @@ volumes:
   loki_data:
   tempo_data:
   alloy_data:
+  backend_node_modules:

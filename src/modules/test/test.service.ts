@@ -8,16 +8,24 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
-import { LoggerService } from '../../common/logger/logger.service';
+import { ContextLogger } from '../../common/logger/context-logger';
+import { LoggerFactory } from '../../common/logger/logger.factory';
 
 @Injectable()
 export class TestService {
+  private readonly logger: ContextLogger;
+
   private getRandomValue<T>(arr: T[]): T {
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
-  constructor(private readonly logger: LoggerService) {
-    this.logger.setContext(TestService.name);
+  constructor(
+    loggerFactory: LoggerFactory,
+  ) {
+    this.logger =
+      loggerFactory.create(
+        TestService.name,
+      );
   }
 
   private throwRandomHttpError(): never {

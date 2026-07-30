@@ -8,8 +8,9 @@ import {
 } from '../applications/schemas/application.schema';
 import { EmployerAnalyticsResponseDto } from './dto/analytics-response.dto';
 import { getTrend } from '../../common/utils/trends.util';
-import { LoggerService } from '../../common/logger/logger.service';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
+import { ContextLogger } from '../../common/logger/context-logger';
+import { LoggerFactory } from '../../common/logger/logger.factory';
 
 interface PopulatedApplicant {
   name: string;
@@ -25,15 +26,19 @@ interface PopulatedJob {
  */
 @Injectable()
 export class AnalyticsService {
+  private readonly logger: ContextLogger;
   private readonly tracer = trace.getTracer('analytics-service');
 
   constructor(
     @InjectModel(Job.name) private jobModel: Model<JobDocument>,
     @InjectModel(Application.name)
     private applicationModel: Model<ApplicationDocument>,
-    private readonly logger: LoggerService,
+    loggerFactory: LoggerFactory,
   ) {
-    this.logger.setContext(AnalyticsService.name);
+    this.logger =
+      loggerFactory.create(
+        AnalyticsService.name,
+      );
   }
 
   /**
@@ -223,17 +228,17 @@ export class AnalyticsService {
             .populate('applicant', 'name email avatar')
             .populate('job', 'title')
             .lean()) as unknown as Array<{
-            applicant: {
-              name: string;
-              email: string;
-              avatar?: string;
-            };
-            job: {
-              title: string;
-            };
-            status: string;
-            createdAt: Date;
-          }>;
+              applicant: {
+                name: string;
+                email: string;
+                avatar?: string;
+              };
+              job: {
+                title: string;
+              };
+              status: string;
+              createdAt: Date;
+            }>;
 
           const recentApplicationsDto = recentApplications.map((app) => ({
             applicant: {

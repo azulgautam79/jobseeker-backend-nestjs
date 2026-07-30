@@ -17,18 +17,26 @@ import { Role } from '../../common/enums/role';
 import { PublicProfileResponseDto } from './dto/public-profile-response.dto';
 import cloudinary from '../../common/config/cloudinary.config';
 import { LoggerService } from '../../common/logger/logger.service';
+import { ContextLogger } from '../../common/logger/context-logger';
+import { LoggerFactory } from '../../common/logger/logger.factory';
 /**
  *! User Services
  */
 @Injectable()
 export class UsersService {
+
+  private readonly logger: ContextLogger;
+
   //! DI
   constructor(
     @InjectModel(User.name)
     private userModel: Model<UserDocument>,
-    private readonly logger: LoggerService,
+    loggerFactory: LoggerFactory,
   ) {
-    this.logger.setContext(UsersService.name);
+    this.logger =
+      loggerFactory.create(
+        UsersService.name,
+      );
   }
 
   async create(createUserDto: Partial<User>) {
