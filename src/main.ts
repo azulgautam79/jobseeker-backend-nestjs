@@ -138,7 +138,7 @@ async function bootstrap() {
     ],
   });
 
-  // app.useGlobalInterceptors(app.get(MetricsInterceptor));
+  app.useGlobalInterceptors(app.get(MetricsInterceptor));
 
   // const prometheusService = app.get(PrometheusService);
 
