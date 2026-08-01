@@ -12,4 +12,12 @@ export const CacheKeys = {
   categories: () => 'categories',
 
   skills: () => 'skills',
+
+  myApplications(userId: string) {
+    return `applications:user:${userId}`
+  },
+
+  jobApplicants(jobId: string) {
+    return `applications:user:${jobId}`
+  }
 };
