@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   Histogram,
   Counter,
+  Gauge,
   Registry,
   collectDefaultMetrics,
 } from 'prom-client';
@@ -13,9 +14,12 @@ export class PrometheusService {
   public readonly httpDuration: Histogram<string>;
   public readonly httpRequests: Counter<string>;
   public readonly httpResponseSize: Histogram<string>;
+  public readonly httpInFlight: Gauge<string>;
 
   constructor() {
-    this.register.setDefaultLabels({ app: 'nestjs-prometheus' });
+    this.register.setDefaultLabels({
+      service: 'jobseeker-api',
+    });
 
     //! Collect Node.js default metrics (CPU, memory, event loop, etc.)
     collectDefaultMetrics({
@@ -26,7 +30,13 @@ export class PrometheusService {
     this.httpDuration = new Histogram({
       name: 'http_request_duration_seconds',
       help: 'HTTP request latency',
-      labelNames: ['method', 'route', 'status'],
+      labelNames: [
+        'method',
+        'route',
+        'status',
+        'controller',
+        'handler',
+      ],
       buckets: [0.05, 0.1, 0.2, 0.4, 0.5, 1, 2, 5],
       registers: [this.register],
     });
@@ -35,7 +45,7 @@ export class PrometheusService {
     this.httpRequests = new Counter({
       name: 'http_requests_total',
       help: 'Total HTTP requests',
-      labelNames: ['method', 'route', 'status'],
+      labelNames: ['method', 'route', 'status', 'controller', 'handler'],
       registers: [this.register],
     });
 
@@ -43,8 +53,16 @@ export class PrometheusService {
     this.httpResponseSize = new Histogram({
       name: 'http_response_size_bytes',
       help: 'HTTP response size in bytes',
-      labelNames: ['method', 'route', 'status'],
+      labelNames: ['method', 'route', 'status', 'controller', 'handler'],
       buckets: [100, 500, 1000, 5000, 10000, 50000, 100000],
+      registers: [this.register],
+    });
+
+    //! Guages
+    this.httpInFlight = new Gauge({
+      name: 'http_requests_in_flight',
+      help: 'Current number of HTTP requests being processed',
+      labelNames: ['method', 'route'],
       registers: [this.register],
     });
   }

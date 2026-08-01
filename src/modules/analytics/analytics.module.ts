@@ -9,6 +9,7 @@ import {
   ApplicationSchema,
 } from '../applications/schemas/application.schema';
 import { AppLoggerModule } from '../../common/logger/logger.module';
+import { TraceModule } from '../../common/telemetry/tracing/trace.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AppLoggerModule } from '../../common/logger/logger.module';
       { name: Application.name, schema: ApplicationSchema },
     ]),
     AppLoggerModule,
+    TraceModule
   ],
   controllers: [AnalyticsController],
   providers: [AnalyticsService],

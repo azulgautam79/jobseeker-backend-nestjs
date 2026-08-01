@@ -1,5 +1,5 @@
 //! Mongo SRV Error
-import dns from 'node:dns'; 
+import dns from 'node:dns';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -162,17 +162,17 @@ dns.setServers(['1.1.1.1', '8.8.8.8']);
         },
 
         transport:
-          process.env.NODE_ENV === 'production'
-            ? undefined
-            : {
-                target: 'pino-pretty',
-                options: {
-                  colorize: true,
-                  translateTime: 'SYS:standard',
-                  singleLine: true,
-                  ignore: 'pid,hostname',
-                },
+          process.env.ENABLE_PRETTY_LOGS === 'true'
+            ? {
+              target: 'pino-pretty',
+              options: {
+                colorize: true,
+                translateTime: 'SYS:standard',
+                singleLine: true,
+                ignore: 'pid,hostname',
               },
+            }
+            : undefined,
       },
     }),
 

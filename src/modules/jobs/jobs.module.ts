@@ -11,6 +11,8 @@ import { SavedJob, SavedJobSchema } from '../savedJobs/schemas/savedJob.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { RedisModule } from '../redis/redis.module';
 import { JobCacheService } from './job-cache.service';
+import { AppLoggerModule } from '../../common/logger/logger.module';
+import { TraceModule } from '../../common/telemetry/tracing/trace.module';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { JobCacheService } from './job-cache.service';
       { name: User.name, schema: UserSchema },
     ]),
     RedisModule,
+    AppLoggerModule,
+    TraceModule
   ],
   controllers: [JobsController],
   providers: [JobsService, JobCacheService],

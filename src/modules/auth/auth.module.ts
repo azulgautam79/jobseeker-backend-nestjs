@@ -14,7 +14,7 @@ import { MailModule } from '../mail/mail.module';
 import { AuthV2Controller } from './authv2.controller';
 import { AuthV2Service } from './authv2.service';
 import { AppLoggerModule } from '../../common/logger/logger.module';
-import { TraceService } from '../../common/telemetry/tracing/trace.service';
+import { TraceModule } from '../../common/telemetry/tracing/trace.module';
 
 @Module({
   imports: [
@@ -41,7 +41,7 @@ import { TraceService } from '../../common/telemetry/tracing/trace.service';
     UsersModule,
     MailModule,
     AppLoggerModule,
-    TraceService,
+    TraceModule,
   ],
   controllers: [AuthController, AuthV2Controller],
   providers: [AuthService, AuthV2Service, JwtStrategy, RefreshTokenStrategy],
