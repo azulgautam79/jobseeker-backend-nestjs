@@ -24,8 +24,11 @@ import { RedisService } from '../redis/redis.service';
 import { CacheKeys } from '../../common/cache/cache.keys';
 import { CacheTTL } from '../../common/cache/cache.ttl';
 import { JobCacheService } from './job-cache.service';
-import { PinoLogger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
+import { ContextLogger } from '../../common/logger/context-logger';
+import { TraceService } from '../../common/telemetry/tracing/trace.service';
+import { LoggerFactory } from '../../common/logger/logger.factory';
+import { Trace } from '../../common/telemetry/tracing/trace.decorator';
 
 /**
  *! Job Service
@@ -33,6 +36,7 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class JobsService {
   private readonly recommendationThreshold: number;
+  private readonly logger: ContextLogger;
 
   //! DI
   constructor(
@@ -44,15 +48,19 @@ export class JobsService {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly jobCacheService: JobCacheService,
-    private readonly logger: PinoLogger,
+    private readonly traceService: TraceService,
+    loggerFactory: LoggerFactory,
   ) {
-    this.logger.setContext(JobsService.name);
+    this.logger =
+      loggerFactory.create(
+        JobsService.name,
+      );
     this.recommendationThreshold = Number(
       this.configService.getOrThrow('RECOMMENDATION_THRESHOLD'),
     );
   }
 
-  //! Find All Jobs Ko Values haru
+  //? Find All Jobs Ko Values haru
   private buildJobQuery(queryDto: JobQueryDto) {
     const { keyword, location, category, type, minSalary, maxSalary } =
       queryDto;
@@ -199,7 +207,18 @@ export class JobsService {
   /**
    *! Create Job
    */
+  @Trace('jobs.create')
   async create(createJobDto: CreateJobDto, user: any) {
+
+    // this.logger.info('Create job request received', {
+    //   user.email,
+    //   ,
+    // });
+
+    // this.traceService.setCurrentAttributes({
+    //   'auth.email': email,
+    // });
+
     if (user.role !== 'EMPLOYER') {
       throw new ForbiddenException('Only employers can post jobs');
     }
@@ -209,11 +228,11 @@ export class JobsService {
       company: user._id,
     });
     this.logger.info(
+      'Job created',
       {
         employerId: user._id,
         jobId: job.id,
       },
-      'Job created',
     );
     await this.jobCacheService.invalidateAfterMutation(
       job._id.toString(),
@@ -225,6 +244,7 @@ export class JobsService {
   /**
    *! Get All Jobs with Queries
    */
+  @Trace('jobs.findall')
   async findAll(queryDto: JobQueryDto) {
     const { page = 1, limit = 10 } = queryDto;
 
@@ -261,22 +281,34 @@ export class JobsService {
   /**
    *! Get All Jobs Without Queries
    */
+  @Trace('jobs.find-without-filters')
   async findJobsWithoutFilters() {
-    return this.redisService.remember(
-      CacheKeys.jobs(),
-      async () => {
-        return this.jobModel
-          .find({ isClosed: false })
-          .populate('company', 'name companyName companyLogo')
-          .lean();
-      },
-      CacheTTL.FIVE_MINUTES,
-    );
+
+    this.logger.info('Jobs without filter requested')
+    // this.traceService.setCurrentAttribute
+    try {
+      return this.redisService.remember(
+        CacheKeys.jobs(),
+        async () => {
+          return this.jobModel
+            .find({ isClosed: false })
+            .populate('company', 'name companyName companyLogo')
+            .lean();
+        },
+        CacheTTL.FIVE_MINUTES,
+      );
+    } catch (error) {
+      this.traceService.setCurrentError(error);
+      this.logger.error('Fetch failed - jobs without filter', error);
+      throw error;
+    }
+
   }
 
   /**
    *! Employer Jobs
    */
+  @Trace('jobs.employer-jobs')
   async findEmployerJobs(user: any) {
     if (user.role !== 'EMPLOYER') {
       throw new ForbiddenException('Access denied');
@@ -328,6 +360,7 @@ export class JobsService {
   /**
    *! Get Job by id
    */
+  @Trace('jobs.find-id')
   async findOne(id: string, userId?: string) {
     const job = await this.redisService.remember(
       CacheKeys.job(id),
@@ -366,6 +399,7 @@ export class JobsService {
   /**
    *! Update a Job
    */
+  @Trace('jobs.update')
   async update(id: string, dto: UpdateJobDto, user: any) {
     const job = await this.jobModel.findById(id);
     if (!job) throw new NotFoundException('Job not found');
@@ -388,6 +422,7 @@ export class JobsService {
   /**
    *! Delete job
    */
+  @Trace('jobs.delete')
   async remove(id: string, user: any) {
     const job = await this.jobModel.findById(id);
     if (!job) throw new NotFoundException('Job not found');
@@ -409,6 +444,7 @@ export class JobsService {
   /**
    *! Toggle Close
    */
+  @Trace('jobs.close')
   async toggleClose(id: string, user: any) {
     const job = await this.jobModel.findById(id);
     if (!job) throw new NotFoundException('Job not found');

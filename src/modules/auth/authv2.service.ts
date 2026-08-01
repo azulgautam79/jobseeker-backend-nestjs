@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -16,7 +15,7 @@ import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { ConfigService } from '@nestjs/config';
-import { generateOtp, hashOtp, otpExpiry } from '../../common/utils/otp.util';
+import { generateOtp, otpExpiry } from '../../common/utils/otp.util';
 import { Otp } from './schemas/otp.schema';
 import { MailService } from '../mail/mail.service';
 import { VerifyEmailDto } from './dto/verifyEmail.dto';
@@ -121,41 +120,110 @@ export class AuthV2Service {
    */
   @Trace('authv2.refresh-token')
   async refreshTokens(refreshToken: string) {
-    const payload = await this.jwtService.verifyAsync(refreshToken);
+    this.logger.info('Refresh token request received')
+    this.traceService.addCurrentEvent('Refresh token verification started');
 
-    const user = await this.UserModel.findById(payload.sub).select('-password');
+    try {
+      const payload = await this.jwtService.verifyAsync(refreshToken);
+      this.traceService.setCurrentAttributes({
+        'user.id': payload.sub
+      });
 
-    if (!user || !user.refreshToken)
-      throw new UnauthorizedException("Refresh Token doesn't exist");
+      const user = await this.UserModel.findById(payload.sub).select('-password');
 
-    const matches = await bcrypt.compare(refreshToken, user.refreshToken);
+      if (!user || !user.refreshToken) {
+        this.logger.warn('Refresh failed - refresh token not found', {
+          userId: payload.sub,
+        });
+        this.traceService.addCurrentEvent('Refresh token not found');
+        throw new UnauthorizedException("Refresh Token doesn't exist");
+      }
 
-    if (!matches) throw new ForbiddenException('Refresh Token doesnot match ');
+      this.traceService.setCurrentAttributes({
+        'user.role': user.role,
+      });
 
-    const remainingMs = user.refreshTokenExpiresAt.getTime() - Date.now();
-    if (remainingMs <= 0)
-      throw new UnauthorizedException('Refresh token expired');
+      const matches = await bcrypt.compare(refreshToken, user.refreshToken);
 
-    const tokens = await this.generateTokens(
-      user._id,
-      user.email,
-      user.role,
-      undefined,
-      Math.floor(remainingMs / 1000),
-    );
+      if (!matches) {
+        this.logger.warn('Refresh failed - token mismatch', {
+          userId: user.id,
+        });
 
-    await this.updateRefreshToken(
-      user.id,
-      tokens.refreshToken,
-      user.refreshTokenExpiresAt,
-    );
+        this.traceService.addCurrentEvent(
+          'Refresh token mismatch',
+        );
 
-    return {
-      accessToken: tokens.accessToken,
-      newRefreshToken: tokens.refreshToken,
-      user: this.buildResponse(user),
-      remainingMs,
-    };
+        throw new ForbiddenException(
+          'Refresh Token doesnot match',
+        );
+      }
+
+      const remainingMs = user.refreshTokenExpiresAt.getTime() - Date.now();
+      if (remainingMs <= 0) {
+        this.logger.warn('Refresh failed - token expired', {
+          userId: user.id,
+        });
+
+        this.traceService.addCurrentEvent(
+          'Refresh token expired',
+        );
+
+        throw new UnauthorizedException(
+          'Refresh token expired',
+        );
+      }
+
+      this.traceService.setCurrentAttribute(
+        'auth.remaining_ms',
+        remainingMs,
+      );
+
+      const tokens = await this.generateTokens(
+        user._id,
+        user.email,
+        user.role,
+        undefined,
+        Math.floor(remainingMs / 1000),
+      );
+
+      this.traceService.addCurrentEvent(
+        'New JWT tokens generated',
+      );
+
+      await this.updateRefreshToken(
+        user.id,
+        tokens.refreshToken,
+        user.refreshTokenExpiresAt,
+      );
+
+      this.traceService.addCurrentEvent(
+        'Refresh token rotated',
+      );
+
+      this.logger.info('Access token refreshed successfully', {
+        userId: user.id,
+        email: user.email,
+      });
+
+      return {
+        accessToken: tokens.accessToken,
+        newRefreshToken: tokens.refreshToken,
+        user: this.buildResponse(user),
+        remainingMs,
+      };
+    } catch (error) {
+      this.traceService.setCurrentError(error);
+
+      this.logger.error(
+        'Refresh token operation failed',
+        error,
+      );
+
+      throw error;
+    }
+
+
   }
 
   /**
@@ -170,16 +238,25 @@ export class AuthV2Service {
       role,
     });
 
+    this.traceService.setCurrentAttributes({
+      'auth.email': email,
+      'auth.role': role,
+    });
+
     const emailInUse = await this.usersService.findByEmail(email);
     if (emailInUse) {
       this.logger.warn('Registration failed - email already exists', {
         email,
       });
+      this.traceService.addCurrentEvent('User with this email already exists');
       throw new BadRequestException('User with this email already exists');
     }
+    this.traceService.addCurrentEvent('Email availability verified');
 
     try {
       const hashedPassword = await bcrypt.hash(password, this.SALT_ROUNDS);
+
+      this.traceService.addCurrentEvent('Password hashed');
 
       const user = await this.UserModel.create({
         name,
@@ -190,6 +267,15 @@ export class AuthV2Service {
         // avatar,
         // avatarPublicId,
       });
+
+      this.traceService.setCurrentAttributes({
+        'user.id': user.id,
+        'user.role': user.role,
+      });
+
+      this.traceService.addCurrentEvent(
+        'User account created',
+      );
 
       this.logger.info('User account created', {
         userId: user._id.toString(),
@@ -208,6 +294,10 @@ export class AuthV2Service {
         userId: user._id,
         type: 'VERIFY_EMAIL',
       });
+
+      this.traceService.addCurrentEvent(
+        'Verification OTP generated',
+      );
 
       this.logger.debug('Email verification OTP generated', {
         userId: user._id.toString(),
@@ -242,25 +332,27 @@ export class AuthV2Service {
 
       await this.mailService.sendMail(user.email, subject, message, message);
 
+      this.traceService.addCurrentEvent(
+        'Verification email sent',
+      );
+
       this.logger.info('Verification email sent', {
-        userId: user._id.toString(),
+        userId: user.id,
         email: user.email,
       });
 
       this.logger.info('User registration completed successfully', {
-        userId: user._id.toString(),
+        userId: user.id,
       });
 
       return { message: `Verify Otp sent to your email: ${user.email}` };
     } catch (error) {
-      // console.error('Error during user registration:', error);
+      this.traceService.setCurrentError(error);
       this.logger.error('User registration failed', error, {
         email,
         role,
       });
-      throw new InternalServerErrorException(
-        'An error occured during registration',
-      );
+      throw error;
     }
   }
 
@@ -275,21 +367,33 @@ export class AuthV2Service {
       email,
     });
 
+    this.traceService.setCurrentAttributes({
+      'auth.email': email,
+    });
+
     try {
       // Find the user
       const user = await this.UserModel.findOne({ email });
+
       if (!user) {
         this.logger.warn('Email verification failed - user not found', {
           email,
         });
+        this.traceService.addCurrentEvent('Invalid email');
         throw new BadRequestException('Invalid email');
       }
+
+      this.traceService.setCurrentAttributes({
+        'user.id': user.id,
+        'user.role': user.role,
+      });
 
       if (user.isEmailVerified) {
         this.logger.warn('Email verification skipped - already verified', {
           userId: user.id,
           email: user.email,
         });
+        this.traceService.addCurrentEvent('Email already verified');
         throw new BadRequestException('Email already verified');
       }
 
@@ -304,6 +408,7 @@ export class AuthV2Service {
           userId: user.id,
           email: user.email,
         });
+        this.traceService.addCurrentEvent('Invalid OTP');
         throw new BadRequestException('OTP not found');
       }
 
@@ -315,9 +420,13 @@ export class AuthV2Service {
           userId: user.id,
           email: user.email,
         });
-
-        throw new BadRequestException('OTP expired');
+        this.traceService.addCurrentEvent('OTP Expired');
+        throw new BadRequestException('OTP Expired');
       }
+
+      this.traceService.addCurrentEvent(
+        'Verification OTP found',
+      );
 
       // Compare OTP
       const isOtpValid = await bcrypt.compare(otp, otpRecord.otp);
@@ -327,13 +436,20 @@ export class AuthV2Service {
           userId: user.id,
           email: user.email,
         });
+        this.traceService.addCurrentEvent('Invalid OTP');
         throw new BadRequestException('Invalid OTP');
       }
 
       // OTP is valid, mark user as verified
+      this.traceService.addCurrentEvent(
+        'OTP validated',
+      );
       user.isEmailVerified = true;
       await user.save();
 
+      this.traceService.addCurrentEvent(
+        'User email verified',
+      );
       this.logger.info('User email verified', {
         userId: user.id,
         email: user.email,
@@ -341,6 +457,9 @@ export class AuthV2Service {
 
       // Delete OTP after successful verification
       await this.otpModel.deleteOne({ _id: otpRecord._id });
+      this.traceService.addCurrentEvent(
+        'Verification OTP deleted',
+      );
 
       // Generate access & refresh tokens
       const tokens = await this.generateTokens(
@@ -348,6 +467,10 @@ export class AuthV2Service {
         user.email,
         user.role,
         false, // rememberMe
+      );
+
+      this.traceService.addCurrentEvent(
+        'JWT tokens generated',
       );
 
       const ttl = Number(
@@ -363,6 +486,9 @@ export class AuthV2Service {
         refreshTokenExpiresAt,
       );
 
+      this.traceService.addCurrentEvent(
+        'Refresh token updated',
+      );
       this.logger.info('Email verified successfully', {
         userId: user.id,
         email: user.email,
@@ -370,17 +496,13 @@ export class AuthV2Service {
 
       return { message: 'Email verified successfully. You can now login.' };
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
+      this.traceService.setCurrentError(error);
 
       this.logger.error('Email verification failed', error, {
         email,
       });
 
-      throw new InternalServerErrorException(
-        'An error occurred while verifying email.',
-      );
+      throw error;
     }
   }
 
@@ -401,99 +523,107 @@ export class AuthV2Service {
       'auth.remember_me': rememberMe,
     });
 
-    const refreshExpiresAt = rememberMe
-      ? new Date(
-        Date.now() +
-        Number(
-          ms(this.configService.getOrThrow('REFRESH_TOKEN_REMEMBER_TIME')),
-        ),
-      )
-      : new Date(
-        Date.now() +
-        Number(ms(this.configService.getOrThrow('REFRESH_TOKEN_TIME'))),
+    try {
+      const refreshExpiresAt = rememberMe
+        ? new Date(
+          Date.now() +
+          Number(
+            ms(this.configService.getOrThrow('REFRESH_TOKEN_REMEMBER_TIME')),
+          ),
+        )
+        : new Date(
+          Date.now() +
+          Number(ms(this.configService.getOrThrow('REFRESH_TOKEN_TIME'))),
+        );
+
+      const user = await this.usersService.findByEmail(email);
+
+      if (!user) {
+        this.logger.warn('Login failed - user not found', { email });
+
+        this.traceService.addCurrentEvent('User not found');
+
+        throw new UnauthorizedException(
+          'Invalid email or password',
+        );
+      }
+
+      const validPassword = await bcrypt.compare(
+        password.trim(),
+        user.password.trim(),
       );
 
-    const user = await this.usersService.findByEmail(email);
+      if (!validPassword) {
+        this.logger.warn('Login failed - invalid password', {
+          userId: user._id.toString(),
+        });
 
-    if (!user) {
-      this.logger.warn('Login failed - user not found', { email });
+        this.traceService.addCurrentEvent(
+          'Invalid password',
+        );
 
-      this.traceService.addCurrentEvent('User not found');
+        throw new UnauthorizedException(
+          'Invalid email or password',
+        );
+      }
 
-      throw new UnauthorizedException(
-        'Invalid email or password',
-      );
-    }
+      if (!user.isEmailVerified) {
+        this.logger.warn(
+          'Login failed - email not verified',
+          {
+            userId: user.id,
+          },
+        );
 
-    const validPassword = await bcrypt.compare(
-      password.trim(),
-      user.password.trim(),
-    );
+        this.traceService.addCurrentEvent(
+          'Email not verified',
+        );
+        throw new UnauthorizedException('Please verify your email first');
+      }
 
-    if (!validPassword) {
-      this.logger.warn('Login failed - invalid password', {
-        userId: user.id,
+      this.traceService.setCurrentAttributes({
+        'user.id': user.id,
+        'user.role': user.role,
       });
 
-      this.traceService.addCurrentEvent(
-        'Invalid password',
-      );
-
-      throw new UnauthorizedException(
-        'Invalid email or password',
-      );
-    }
-
-    if (!user.isEmailVerified) {
-      this.logger.warn(
-        'Login failed - email not verified',
-        {
-          userId: user.id,
-        },
+      const tokens = await this.generateTokens(
+        user.id,
+        user.email,
+        user.role,
+        rememberMe,
       );
 
       this.traceService.addCurrentEvent(
-        'Email not verified',
+        'JWT tokens generated',
       );
-      throw new UnauthorizedException('Please verify your email first');
+
+      await this.updateRefreshToken(
+        user.id,
+        tokens.refreshToken,
+        refreshExpiresAt,
+      );
+
+      this.traceService.addCurrentEvent(
+        'Refresh token updated',
+      );
+
+      this.logger.info('User logged in successfully', {
+        userId: user.id,
+        email: user.email,
+      });
+
+      return {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        user: this.buildResponse(user),
+      };
+    } catch (error) {
+      this.traceService.setCurrentError(error);
+      this.logger.error('Login failed', error, {
+        email,
+      });
+      throw error;
     }
-
-    this.traceService.setCurrentAttributes({
-      'user.id': user.id,
-      'user.role': user.role,
-    });
-
-    const tokens = await this.generateTokens(
-      user.id,
-      user.email,
-      user.role,
-      rememberMe,
-    );
-
-    this.traceService.addCurrentEvent(
-      'JWT tokens generated',
-    );
-
-    await this.updateRefreshToken(
-      user.id,
-      tokens.refreshToken,
-      refreshExpiresAt,
-    );
-
-    this.traceService.addCurrentEvent(
-      'Refresh token updated',
-    );
-
-    this.logger.info('User logged in successfully', {
-      userId: user.id,
-      email: user.email,
-    });
-
-    return {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      user: this.buildResponse(user),
-    };
   }
 
   /**
@@ -501,33 +631,61 @@ export class AuthV2Service {
    */
   @Trace('authv2.forgot-password')
   async forgotPassword(email: string): Promise<{ message: string }> {
-    const user = await this.UserModel.findOne({ email });
 
-    if (!user) {
-      throw new NotFoundException('User not Found');
-    }
+    this.logger.info('Forgot password requested', { email });
 
-    const otp = generateOtp();
-    const hashedOtp = await bcrypt.hash(otp, 10);
-
-    // Invalidate previous forgot password OTPs
-    await this.otpModel.deleteMany({
-      userId: user._id,
-      type: 'FORGOT_PASSWORD',
+    this.traceService.setCurrentAttributes({
+      'auth.email': email,
     });
 
-    await this.otpModel.create({
-      otp: hashedOtp,
-      expiresAt: otpExpiry(this.configService.get('OTP_EXPIRY_TIME')), // Expires in 10 mins
-      userId: user._id,
-      type: 'FORGOT_PASSWORD',
-    });
+    try {
+      const user = await this.UserModel.findOne({ email });
 
-    const companyLogo = 'https://i.imgur.com/3KcynwC.png';
+      if (!user) {
+        this.logger.warn('Forgot password failed - user not found', {
+          email,
+        });
+        this.traceService.addCurrentEvent('User not found');
+        throw new NotFoundException('User not Found');
+      }
+      this.traceService.setCurrentAttributes({
+        'user.id': user.id,
+        'user.role': user.role,
+      });
+      this.traceService.addCurrentEvent(
+        'User found',
+      );
 
-    const subject = `JobSeeker Reset Password OTP`;
+      const otp = generateOtp();
+      const hashedOtp = await bcrypt.hash(otp, 10);
+      this.traceService.addCurrentEvent(
+        'Password reset OTP generated',
+      );
 
-    const message = `
+      // Invalidate previous forgot password OTPs
+      await this.otpModel.deleteMany({
+        userId: user._id,
+        type: 'FORGOT_PASSWORD',
+      });
+      this.traceService.addCurrentEvent(
+        'Previous OTPs invalidated',
+      );
+
+      await this.otpModel.create({
+        otp: hashedOtp,
+        expiresAt: otpExpiry(this.configService.get('OTP_EXPIRY_TIME')), // Expires in 10 mins
+        userId: user._id,
+        type: 'FORGOT_PASSWORD',
+      });
+      this.traceService.addCurrentEvent(
+        'Password reset OTP stored',
+      );
+
+      const companyLogo = 'https://i.imgur.com/3KcynwC.png';
+
+      const subject = `JobSeeker Reset Password OTP`;
+
+      const message = `
         <div style="font-family: Arial, Helvetica, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
           <!-- Header with logo -->
           <div style="text-align: center; margin-bottom: 30px;">
@@ -550,9 +708,25 @@ export class AuthV2Service {
         </div>
       `;
 
-    await this.mailService.sendMail(user.email, subject, message, message);
+      await this.mailService.sendMail(user.email, subject, message, message);
+      this.traceService.addCurrentEvent(
+        'Password reset email sent',
+      );
 
-    return { message: `OTP has been sent to your email: ${user.email}` };
+      this.logger.info(
+        'Password reset OTP sent successfully',
+        {
+          userId: user.id,
+          email: user.email,
+        },
+      );
+      return { message: `OTP has been sent to your email: ${user.email}` };
+
+    } catch (error) {
+      this.traceService.setCurrentError(error);
+      this.logger.error('Forgot password failed', error, { email });
+      throw error;
+    }
   }
 
   /**
@@ -564,23 +738,101 @@ export class AuthV2Service {
     otp: string,
     type: 'VERIFY_EMAIL' | 'FORGOT_PASSWORD',
   ): Promise<boolean> {
-    const user = await this.UserModel.findOne({ email });
-    if (!user) throw new UnauthorizedException();
 
-    const otpRecord = await this.otpModel.findOne({ userId: user._id, type });
-    if (!otpRecord) throw new UnauthorizedException('OTP expired');
+    this.logger.info('OTP verification requested', {
+      email,
+      type,
+    });
 
-    if (otpRecord.expiresAt < new Date()) {
+    this.traceService.setCurrentAttributes({
+      'auth.email': email,
+      'auth.otp_type': type,
+    });
+
+    try {
+      const user = await this.UserModel.findOne({ email });
+      if (!user) {
+        this.logger.warn('OTP verification failed - user not found', {
+          email,
+          type,
+        });
+
+        this.traceService.addCurrentEvent('User not found');
+
+        throw new UnauthorizedException();
+      }
+
+      this.traceService.setCurrentAttributes({
+        'user.id': user.id,
+        'user.role': user.role,
+      });
+
+      this.traceService.addCurrentEvent('User found');
+
+      const otpRecord = await this.otpModel.findOne({ userId: user._id, type });
+      if (!otpRecord) {
+        this.logger.warn('OTP verification failed - OTP not found', {
+          userId: user.id,
+          type,
+        });
+
+        this.traceService.addCurrentEvent('OTP not found');
+
+        throw new UnauthorizedException('OTP expired');
+      }
+
+      this.traceService.addCurrentEvent('OTP found');
+
+      if (otpRecord.expiresAt < new Date()) {
+        await this.otpModel.deleteOne({ _id: otpRecord._id });
+        this.logger.warn('OTP verification failed - OTP expired', {
+          userId: user.id,
+          type,
+        });
+
+        this.traceService.addCurrentEvent('OTP expired');
+
+        throw new UnauthorizedException('OTP expired');
+      }
+
+      const isValid = await bcrypt.compare(otp, otpRecord.otp);
+      if (!isValid) {
+        this.logger.warn('OTP verification failed - invalid OTP', {
+          userId: user.id,
+          type,
+        });
+
+        this.traceService.addCurrentEvent('Invalid OTP');
+
+        throw new UnauthorizedException('Invalid OTP');
+      }
+      this.traceService.addCurrentEvent('OTP validated');
+
       await this.otpModel.deleteOne({ _id: otpRecord._id });
-      throw new UnauthorizedException('OTP expired');
+
+      this.traceService.addCurrentEvent('OTP deleted');
+
+      this.logger.info('OTP verified successfully', {
+        userId: user.id,
+        type,
+      });
+
+      return true;
+
+    } catch (error) {
+      this.traceService.setCurrentError(error);
+
+      this.logger.error(
+        'OTP verification failed',
+        error,
+        {
+          email,
+          type,
+        },
+      );
+
+      throw error;
     }
-
-    const isValid = await bcrypt.compare(otp, otpRecord.otp);
-    if (!isValid) throw new UnauthorizedException('Invalid OTP');
-
-    await this.otpModel.deleteOne({ _id: otpRecord._id });
-
-    return true;
   }
 
   /**
@@ -591,35 +843,82 @@ export class AuthV2Service {
     email: string,
     type: 'VERIFY_EMAIL' | 'FORGOT_PASSWORD',
   ): Promise<{ message: string }> {
-    const user = await this.UserModel.findOne({ email });
 
-    if (!user) {
-      throw new BadRequestException('Invalid email');
-    }
-
-    if (type === 'VERIFY_EMAIL' && user.isEmailVerified) {
-      throw new BadRequestException('Email already verified');
-    }
-
-    const otp = generateOtp();
-    const hashedOtp = await bcrypt.hash(otp, 10);
-
-    // Invalidate previous verification OTPs
-    await this.otpModel.deleteMany({ userId: user._id, type });
-
-    await this.otpModel.create({
-      otp: hashedOtp,
-      expiresAt: otpExpiry(this.configService.get('OTP_EXPIRY_TIME')), // e.g., 10 minutes
-      userId: user._id,
+    this.logger.info('OTP resend requested', {
+      email,
       type,
     });
 
-    const companyLogo = 'https://i.imgur.com/3KcynwC.png';
+    this.traceService.setCurrentAttributes({
+      'auth.email': email,
+      'auth.otp_type': type,
+    });
 
-    const subject =
-      type === 'VERIFY_EMAIL' ? 'Verify your email' : 'Reset password OTP';
+    try {
+      const user = await this.UserModel.findOne({ email });
 
-    const message = `
+      if (!user) {
+        this.logger.warn('OTP resend failed - user not found', {
+          email,
+          type,
+        });
+
+        this.traceService.addCurrentEvent('User not found');
+
+        throw new BadRequestException('Invalid email');
+      }
+
+      this.traceService.setCurrentAttributes({
+        'user.id': user.id,
+        'user.role': user.role,
+      });
+
+      this.traceService.addCurrentEvent('User found');
+
+      if (type === 'VERIFY_EMAIL' && user.isEmailVerified) {
+        this.logger.warn('OTP resend failed - email already verified', {
+          userId: user.id,
+          email: user.email,
+        });
+
+        this.traceService.addCurrentEvent(
+          'Email already verified',
+        );
+
+        throw new BadRequestException('Email already verified');
+      }
+
+      const otp = generateOtp();
+      const hashedOtp = await bcrypt.hash(otp, 10);
+
+      this.traceService.addCurrentEvent(
+        'New OTP generated',
+      );
+
+      // Invalidate previous verification OTPs
+      await this.otpModel.deleteMany({ userId: user._id, type });
+
+      this.traceService.addCurrentEvent(
+        'Previous OTPs invalidated',
+      );
+
+      await this.otpModel.create({
+        otp: hashedOtp,
+        expiresAt: otpExpiry(this.configService.get('OTP_EXPIRY_TIME')), // e.g., 10 minutes
+        userId: user._id,
+        type,
+      });
+
+      this.traceService.addCurrentEvent(
+        'New OTP stored',
+      );
+
+      const companyLogo = 'https://i.imgur.com/3KcynwC.png';
+
+      const subject =
+        type === 'VERIFY_EMAIL' ? 'Verify your email' : 'Reset password OTP';
+
+      const message = `
         <div style="font-family: Arial, Helvetica, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
           <!-- Header with logo -->
           <div style="text-align: center; margin-bottom: 30px;">
@@ -642,9 +941,36 @@ export class AuthV2Service {
         </div>
       `;
 
-    await this.mailService.sendMail(user.email, subject, message, message);
+      await this.mailService.sendMail(user.email, subject, message, message);
 
-    return { message: `OTP has been sent to your email: ${user.email}` };
+      this.traceService.addCurrentEvent(
+        'OTP email sent',
+      );
+
+      this.logger.info('OTP resent successfully', {
+        userId: user.id,
+        email: user.email,
+        type,
+      });
+
+      return {
+        message: `OTP has been sent to your email: ${user.email}`,
+      };
+    } catch (error) {
+      this.traceService.setCurrentError(error);
+
+      this.logger.error(
+        'OTP resend failed',
+        error,
+        {
+          email,
+          type,
+        },
+      );
+
+      throw error;
+    }
+
   }
 
   /**
@@ -655,18 +981,79 @@ export class AuthV2Service {
     email: string,
     newPassword: string,
   ): Promise<{ message: string }> {
-    const user = await this.UserModel.findOne({ email });
-    if (!user) throw new UnauthorizedException();
+    this.logger.info('Password reset requested', {
+      email,
+    });
 
-    user.password = await bcrypt.hash(newPassword, 10);
-    user.refreshToken = '';
+    this.traceService.setCurrentAttributes({
+      'auth.email': email,
+    });
 
-    await user.save();
-    await this.otpModel.deleteMany({ userId: user._id });
+    try {
+      const user = await this.UserModel.findOne({ email });
+      if (!user) {
+        this.logger.warn('Password reset failed - user not found', {
+          email,
+        });
 
-    return {
-      message: 'Password reset successfully!',
-    };
+        this.traceService.addCurrentEvent(
+          'User not found',
+        );
+
+        throw new UnauthorizedException();
+      }
+
+      this.traceService.setCurrentAttributes({
+        'user.id': user.id,
+        'user.role': user.role,
+      });
+
+      this.traceService.addCurrentEvent(
+        'User found',
+      );
+
+      user.password = await bcrypt.hash(newPassword, 10);
+      this.traceService.addCurrentEvent(
+        'Password hashed',
+      );
+      user.refreshToken = '';
+      this.traceService.addCurrentEvent(
+        'Refresh token invalidated',
+      );
+
+      await user.save();
+      this.traceService.addCurrentEvent(
+        'User password updated',
+      );
+
+      await this.otpModel.deleteMany({ userId: user._id });
+
+      this.traceService.addCurrentEvent(
+        'User OTPs deleted',
+      );
+
+      this.logger.info('Password reset completed successfully', {
+        userId: user.id,
+        email: user.email,
+      });
+
+      return {
+        message: 'Password reset successfully!',
+      };
+    } catch (error) {
+      this.traceService.setCurrentError(error);
+
+      this.logger.error(
+        'Password reset failed',
+        error,
+        {
+          email,
+        },
+      );
+
+      throw error;
+    }
+
   }
 
   /**
@@ -674,9 +1061,52 @@ export class AuthV2Service {
    */
   @Trace('authv2.logout')
   async logout(userId: string): Promise<void> {
-    await this.UserModel.updateOne(
-      { _id: userId },
-      { $set: { refreshToken: null } },
-    );
+
+    this.logger.info('Logout requested', { userId });
+
+    this.traceService.setCurrentAttributes({ 'user.id': userId })
+
+    try {
+      const result = await this.UserModel.updateOne(
+        { _id: userId },
+        {
+          $set: {
+            refreshToken: null,
+          },
+        },
+      );
+
+      if (result.matchedCount === 0) {
+        this.logger.warn('Logout failed - user not found', {
+          userId,
+        });
+
+        this.traceService.addCurrentEvent(
+          'User not found',
+        );
+
+        throw new NotFoundException('User not found');
+      }
+
+      this.traceService.addCurrentEvent(
+        'Refresh token invalidated',
+      );
+
+      this.logger.info('User logged out successfully', {
+        userId,
+      });
+    } catch (error) {
+      this.traceService.setCurrentError(error);
+
+      this.logger.error(
+        'Logout failed',
+        error,
+        {
+          userId,
+        },
+      );
+
+      throw error;
+    }
   }
 }

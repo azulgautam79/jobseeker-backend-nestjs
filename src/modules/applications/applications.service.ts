@@ -16,12 +16,19 @@ import { RedisService } from '../redis/redis.service';
 import { CacheKeys } from '../../common/cache/cache.keys';
 import { CacheTTL } from '../../common/cache/cache.ttl';
 import { JobCacheService } from '../jobs/job-cache.service';
+import { ContextLogger } from '../../common/logger/context-logger';
+import { TraceService } from '../../common/telemetry/tracing/trace.service';
+import { LoggerFactory } from '../../common/logger/logger.factory';
+import { Trace } from '../../common/telemetry/tracing/trace.decorator';
 
 /**
  *! Job Application Service
  */
 @Injectable()
 export class ApplicationsService {
+
+  private readonly logger: ContextLogger;
+
   //! DI
   constructor(
     @InjectModel(Application.name)
@@ -29,11 +36,19 @@ export class ApplicationsService {
     @InjectModel(Job.name) private jobModel: Model<JobDocument>,
     private readonly mailService: MailService,
     private readonly redisService: RedisService,
-  ) { }
+    private readonly traceService: TraceService,
+    loggerFactory: LoggerFactory
+  ) { 
+    this.logger =
+          loggerFactory.create(
+            ApplicationsService.name,
+          );
+  }
 
   /**
    *! Apply to Job
    */
+  @Trace('applications.apply')
   async applyToJob(user: any, jobId: string, resume?: string) {
     if (user.role !== 'JOBSEEKER') {
       throw new ForbiddenException('Only jobseekers can apply');
@@ -71,6 +86,7 @@ export class ApplicationsService {
   /**
    *! Get My Applications
    */
+  @Trace('applications.get-my-applications')
   async getMyApplications(userId: Types.ObjectId) {
     return this.applicationModel
       .find({ applicant: userId })
@@ -81,6 +97,7 @@ export class ApplicationsService {
   /**
    *! Get Applicants for Job
    */
+  @Trace('applications.get-application-job')
   async getApplicantsForJob(jobId: string, userId: Types.ObjectId) {
     const uid =
       typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
@@ -117,6 +134,7 @@ export class ApplicationsService {
   /**
    *! Get Application By Id
    */
+  @Trace('applications.get-by-id')
   async getApplicationById(applicationId: string, userId: Types.ObjectId) {
     const app = await this.applicationModel
       .findById(applicationId)
@@ -145,6 +163,7 @@ export class ApplicationsService {
   /**
    *! Update Status
    */
+  @Trace('applications.update-status')
   async updateStatus(
     applicationId: string,
     userId: Types.ObjectId,

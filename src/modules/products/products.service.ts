@@ -4,6 +4,8 @@ import { UpdateProductDto } from './dto/update-product.dto';
 
 @Injectable()
 export class ProductsService {
+
+  
   private products = [
     { id: 1, name: 'Laptop', price: 1000 },
     { id: 2, name: 'Phone', price: 500 },

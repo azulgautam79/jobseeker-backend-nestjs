@@ -19,6 +19,8 @@ import cloudinary from '../../common/config/cloudinary.config';
 import { LoggerService } from '../../common/logger/logger.service';
 import { ContextLogger } from '../../common/logger/context-logger';
 import { LoggerFactory } from '../../common/logger/logger.factory';
+import { Trace } from '../../common/telemetry/tracing/trace.decorator';
+import { TraceService } from '../../common/telemetry/tracing/trace.service';
 /**
  *! User Services
  */
@@ -26,11 +28,13 @@ import { LoggerFactory } from '../../common/logger/logger.factory';
 export class UsersService {
 
   private readonly logger: ContextLogger;
-
+  
   //! DI
   constructor(
     @InjectModel(User.name)
     private userModel: Model<UserDocument>,
+
+    private readonly traceService: TraceService,
     loggerFactory: LoggerFactory,
   ) {
     this.logger =
@@ -39,6 +43,7 @@ export class UsersService {
       );
   }
 
+  @Trace('users.create')
   async create(createUserDto: Partial<User>) {
     return await this.userModel.create(createUserDto);
   }
@@ -46,6 +51,7 @@ export class UsersService {
   /**
    *! Find all users
    */
+  @Trace('users.find-all')
   async findAll() {
     return await this.userModel.find();
   }
@@ -53,6 +59,7 @@ export class UsersService {
   /**
    *! Find user by email address
    */
+  @Trace('users.find-by-email')
   async findByEmail(email: string) {
     return await this.userModel.findOne({ email });
   }
@@ -60,6 +67,7 @@ export class UsersService {
   /**
    *! Find User by id
    */
+  @Trace('users.find-by-id')
   async findOne(id: string) {
     return await this.userModel.findById(id).select('-password');
   }
@@ -67,6 +75,7 @@ export class UsersService {
   /**
    *!  Update User profile
    */
+  @Trace('users.update-profile')
   async updateProfie(
     userId: string,
     dto: UpdateProfileDto,
@@ -211,6 +220,7 @@ export class UsersService {
   /**
    *!  Delete Resume
    */
+  @Trace('users.delete-resume')
   async deleteResume(userId: string) {
     const user = await this.userModel.findById(userId);
 
@@ -251,11 +261,13 @@ export class UsersService {
   /**
    *!   Delete a user
    */
+  @Trace('users.delete-user')
   remove(id: string) {
     return `This action removes a #${id} user`;
   }
 
   //! Get Public profile
+  @Trace('users.find-by')
   async getPublicProfile(userId: string): Promise<PublicProfileResponseDto> {
     const user = await this.userModel
       .findById(userId)
