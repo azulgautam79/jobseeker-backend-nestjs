@@ -20,6 +20,7 @@ import { ContextLogger } from '../../common/logger/context-logger';
 import { TraceService } from '../../common/telemetry/tracing/trace.service';
 import { LoggerFactory } from '../../common/logger/logger.factory';
 import { Trace } from '../../common/telemetry/tracing/trace.decorator';
+import { PrometheusService } from '../../common/prometheus/prometheus.service';
 
 /**
  *! Job Application Service
@@ -37,6 +38,7 @@ export class ApplicationsService {
     private readonly mailService: MailService,
     private readonly redisService: RedisService,
     private readonly traceService: TraceService,
+    private readonly prometheusService: PrometheusService,
     loggerFactory: LoggerFactory
   ) {
     this.logger =
@@ -138,6 +140,7 @@ export class ApplicationsService {
         resume,
       });
 
+      this.prometheusService.applicationsSubmitted.labels(application.status.toString()).inc();
       this.traceService.setCurrentAttribute(
         'application.id',
         application.id,

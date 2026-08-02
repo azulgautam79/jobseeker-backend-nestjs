@@ -15,6 +15,7 @@ import { AuthV2Controller } from './authv2.controller';
 import { AuthV2Service } from './authv2.service';
 import { AppLoggerModule } from '../../common/logger/logger.module';
 import { TraceModule } from '../../common/telemetry/tracing/trace.module';
+import { PrometheusModule } from '../../common/prometheus/prometheus.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { TraceModule } from '../../common/telemetry/tracing/trace.module';
     MailModule,
     AppLoggerModule,
     TraceModule,
+    PrometheusModule
   ],
   controllers: [AuthController, AuthV2Controller],
   providers: [AuthService, AuthV2Service, JwtStrategy, RefreshTokenStrategy],

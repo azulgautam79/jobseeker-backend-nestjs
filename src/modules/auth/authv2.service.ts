@@ -24,6 +24,7 @@ import { ContextLogger } from '../../common/logger/context-logger';
 import { LoggerFactory } from '../../common/logger/logger.factory';
 import { Trace } from '../../common/telemetry/tracing/trace.decorator';
 import { TraceService } from '../../common/telemetry/tracing/trace.service';
+import { PrometheusService } from '../../common/prometheus/prometheus.service';
 
 type OtpType = 'VERIFY_EMAIL' | 'FORGOT_PASSWORD';
 /**
@@ -43,6 +44,7 @@ export class AuthV2Service {
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
     private readonly traceService: TraceService,
+    private readonly prometheusService: PrometheusService,
     loggerFactory: LoggerFactory,
   ) {
     this.logger =
@@ -268,6 +270,7 @@ export class AuthV2Service {
         // avatarPublicId,
       });
 
+      this.prometheusService.usersRegistered.labels(user.role, 'email').inc();
       this.traceService.setCurrentAttributes({
         'user.id': user.id,
         'user.role': user.role,
@@ -331,7 +334,6 @@ export class AuthV2Service {
       `;
 
       await this.mailService.sendMail(user.email, subject, message, message);
-
       this.traceService.addCurrentEvent(
         'Verification email sent',
       );
@@ -344,6 +346,7 @@ export class AuthV2Service {
       this.logger.info('User registration completed successfully', {
         userId: user.id,
       });
+      this.prometheusService.otpSent.labels('email_verification').inc();
 
       return { message: `Verify Otp sent to your email: ${user.email}` };
     } catch (error) {
@@ -539,6 +542,9 @@ export class AuthV2Service {
       const user = await this.usersService.findByEmail(email);
 
       if (!user) {
+        this.prometheusService.loginFailures
+          .labels('user_not_found')
+          .inc();
         this.logger.warn('Login failed - user not found', { email });
 
         this.traceService.addCurrentEvent('User not found');
@@ -554,6 +560,9 @@ export class AuthV2Service {
       );
 
       if (!validPassword) {
+        this.prometheusService.loginFailures
+          .labels('invalid_password')
+          .inc();
         this.logger.warn('Login failed - invalid password', {
           userId: user._id.toString(),
         });
@@ -568,6 +577,9 @@ export class AuthV2Service {
       }
 
       if (!user.isEmailVerified) {
+        this.prometheusService.loginFailures
+          .labels('email_not_verified')
+          .inc();
         this.logger.warn(
           'Login failed - email not verified',
           {
@@ -607,6 +619,10 @@ export class AuthV2Service {
         'Refresh token updated',
       );
 
+      this.prometheusService.userLogins
+        .labels(user.role, 'email')
+        .inc();
+
       this.logger.info('User logged in successfully', {
         userId: user.id,
         email: user.email,
@@ -618,6 +634,11 @@ export class AuthV2Service {
         user: this.buildResponse(user),
       };
     } catch (error) {
+      if (!(error instanceof UnauthorizedException)) {
+        this.prometheusService.loginFailures
+          .labels('internal_error')
+          .inc();
+      }
       this.traceService.setCurrentError(error);
       this.logger.error('Login failed', error, {
         email,
@@ -709,6 +730,7 @@ export class AuthV2Service {
       `;
 
       await this.mailService.sendMail(user.email, subject, message, message);
+      this.prometheusService.otpSent.labels('password_reset').inc();
       this.traceService.addCurrentEvent(
         'Password reset email sent',
       );
@@ -942,7 +964,7 @@ export class AuthV2Service {
       `;
 
       await this.mailService.sendMail(user.email, subject, message, message);
-
+      this.prometheusService.otpSent.labels('otp_resent').inc();
       this.traceService.addCurrentEvent(
         'OTP email sent',
       );

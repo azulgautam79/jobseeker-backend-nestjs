@@ -29,6 +29,7 @@ import { ContextLogger } from '../../common/logger/context-logger';
 import { TraceService } from '../../common/telemetry/tracing/trace.service';
 import { LoggerFactory } from '../../common/logger/logger.factory';
 import { Trace } from '../../common/telemetry/tracing/trace.decorator';
+import { PrometheusService } from '../../common/prometheus/prometheus.service';
 
 /**
  *! Job Service
@@ -49,6 +50,7 @@ export class JobsService {
     private readonly redisService: RedisService,
     private readonly jobCacheService: JobCacheService,
     private readonly traceService: TraceService,
+    private readonly prometheusService: PrometheusService,
     loggerFactory: LoggerFactory,
   ) {
     this.logger =
@@ -270,6 +272,8 @@ export class JobsService {
         ...createJobDto,
         company: user._id,
       });
+
+      this.prometheusService.jobsCreated.labels(job.type.toString()).inc();
 
       this.traceService.setCurrentAttribute(
         'job.id',

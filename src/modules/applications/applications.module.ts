@@ -7,6 +7,7 @@ import { Job, JobSchema } from '../jobs/schemas/job.schema';
 import { MailModule } from '../mail/mail.module';
 import { AppLoggerModule } from '../../common/logger/logger.module';
 import { TraceModule } from '../../common/telemetry/tracing/trace.module';
+import { PrometheusModule } from '../../common/prometheus/prometheus.module';
 
 @Module({
   imports: [
@@ -16,7 +17,8 @@ import { TraceModule } from '../../common/telemetry/tracing/trace.module';
     ]),
     MailModule,
     AppLoggerModule,
-    TraceModule
+    TraceModule,
+    PrometheusModule
   ],
   controllers: [ApplicationsController],
   providers: [ApplicationsService],
