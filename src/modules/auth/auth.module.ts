@@ -16,6 +16,8 @@ import { AuthV2Service } from './authv2.service';
 import { AppLoggerModule } from '../../common/logger/logger.module';
 import { TraceModule } from '../../common/telemetry/tracing/trace.module';
 import { PrometheusModule } from '../../common/prometheus/prometheus.module';
+import { RedisOtpRepository } from './repositories/redis-otp.repository';
+import { OtpRepository } from './repositories/otp.repository';
 
 @Module({
   imports: [
@@ -46,6 +48,15 @@ import { PrometheusModule } from '../../common/prometheus/prometheus.module';
     PrometheusModule
   ],
   controllers: [AuthController, AuthV2Controller],
-  providers: [AuthService, AuthV2Service, JwtStrategy, RefreshTokenStrategy],
+  providers: [
+    AuthService,
+    AuthV2Service,
+    JwtStrategy,
+    RefreshTokenStrategy,
+    {
+      provide: OtpRepository,
+      useClass: RedisOtpRepository
+    }
+  ],
 })
-export class AuthModule {}
+export class AuthModule { }

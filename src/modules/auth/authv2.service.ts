@@ -25,8 +25,10 @@ import { LoggerFactory } from '../../common/logger/logger.factory';
 import { Trace } from '../../common/telemetry/tracing/trace.decorator';
 import { TraceService } from '../../common/telemetry/tracing/trace.service';
 import { PrometheusService } from '../../common/prometheus/prometheus.service';
+import { OtpRepository } from './repositories/otp.repository';
+import { OtpType } from '../../common/enums/otpType';
 
-type OtpType = 'VERIFY_EMAIL' | 'FORGOT_PASSWORD';
+// type OtpType = 'VERIFY_EMAIL' | 'FORGOT_PASSWORD';
 /**
  *! Auth Service
  */
@@ -34,6 +36,66 @@ type OtpType = 'VERIFY_EMAIL' | 'FORGOT_PASSWORD';
 export class AuthV2Service {
   private readonly SALT_ROUNDS = 10;
   private readonly logger: ContextLogger;
+
+  //! Redis
+  private getOtpTtl(): number {
+    return (
+      Number(
+        ms(this.configService.getOrThrow('OTP_EXPIRY_TIME')),
+      ) / 1000
+    );
+  }
+
+  private async validateOtp(user: User, otp: string, type: OtpType): Promise<void> {
+
+    const hashedOtp = await this.otpRepository.getOtp(user._id.toString(), type)
+
+    if (!hashedOtp) {
+      this.logger.warn('OTP validation failed - OTP not found or expired', {
+        userId: user._id.toString(),
+        type,
+      });
+
+      this.traceService.addCurrentEvent('OTP not found');
+
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    const isValid = await bcrypt.compare(otp, hashedOtp);
+
+    if (!isValid) {
+      this.logger.warn('OTP validation failed - invalid OTP', {
+        userId: user._id.toString(),
+        type,
+      });
+
+      this.traceService.addCurrentEvent('Invalid OTP');
+
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    this.traceService.addCurrentEvent('OTP validated');
+
+    await this.otpRepository.deleteOtp(user._id.toString(), type);
+
+    this.traceService.addCurrentEvent('OTP deleted');
+  }
+
+  private async issueOtp(user: User, type: OtpType): Promise<string> {
+
+    const otp = generateOtp();
+
+    const hashedOtp = await bcrypt.hash(otp, 10);
+
+    await this.otpRepository.saveOtp({
+      userId: user._id.toString(),
+      type,
+      hashedOtp,
+      ttl: this.getOtpTtl(),
+    });
+
+    return otp;
+  }
 
   //! Dependency Injection
   constructor(
@@ -43,6 +105,7 @@ export class AuthV2Service {
     private usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
+    private readonly otpRepository: OtpRepository,
     private readonly traceService: TraceService,
     private readonly prometheusService: PrometheusService,
     loggerFactory: LoggerFactory,
@@ -286,17 +349,23 @@ export class AuthV2Service {
         role: user.role,
       });
 
-      // Generate OTP
-      const otp = generateOtp();
-      const hashedOtp = await bcrypt.hash(otp, 10);
-
       // Save OTP in otpModel
-      await this.otpModel.create({
-        otp: hashedOtp,
-        expiresAt: otpExpiry(this.configService.get('OTP_EXPIRY_TIME')), // e.g., 10 minutes
-        userId: user._id,
-        type: 'VERIFY_EMAIL',
-      });
+      // await this.otpModel.create({
+      //   otp: hashedOtp,
+      //   expiresAt: otpExpiry(this.configService.get('OTP_EXPIRY_TIME')), // e.g., 10 minutes
+      //   userId: user._id,
+      //   type: 'VERIFY_EMAIL',
+      // });
+
+      //! Redis for otp storage
+      // await this.otpRepository.saveOtp({
+      //   userId: user._id.toString(),
+      //   type: OtpType.VERIFY_EMAIL,
+      //   hashedOtp,
+      //   ttl: this.getOtpTtl(),
+      // })
+
+      const otp = await this.issueOtp(user, OtpType.VERIFY_EMAIL);
 
       this.traceService.addCurrentEvent(
         'Verification OTP generated',
@@ -400,53 +469,8 @@ export class AuthV2Service {
         throw new BadRequestException('Email already verified');
       }
 
-      // Find the latest verification OTP from otpModel
-      const otpRecord = await this.otpModel.findOne({
-        userId: user._id,
-        type: 'VERIFY_EMAIL',
-      });
-
-      if (!otpRecord) {
-        this.logger.warn('Email verification failed - OTP not found', {
-          userId: user.id,
-          email: user.email,
-        });
-        this.traceService.addCurrentEvent('Invalid OTP');
-        throw new BadRequestException('OTP not found');
-      }
-
-      if (otpRecord.expiresAt < new Date()) {
-        // Optionally delete expired OTP
-        await this.otpModel.deleteOne({ _id: otpRecord._id });
-
-        this.logger.warn('Email verification failed - OTP expired', {
-          userId: user.id,
-          email: user.email,
-        });
-        this.traceService.addCurrentEvent('OTP Expired');
-        throw new BadRequestException('OTP Expired');
-      }
-
-      this.traceService.addCurrentEvent(
-        'Verification OTP found',
-      );
-
-      // Compare OTP
-      const isOtpValid = await bcrypt.compare(otp, otpRecord.otp);
-
-      if (!isOtpValid) {
-        this.logger.warn('Email verification failed - invalid OTP', {
-          userId: user.id,
-          email: user.email,
-        });
-        this.traceService.addCurrentEvent('Invalid OTP');
-        throw new BadRequestException('Invalid OTP');
-      }
-
-      // OTP is valid, mark user as verified
-      this.traceService.addCurrentEvent(
-        'OTP validated',
-      );
+      //! Redis otp
+      await this.validateOtp(user, otp, OtpType.VERIFY_EMAIL);
       user.isEmailVerified = true;
       await user.save();
 
@@ -457,12 +481,6 @@ export class AuthV2Service {
         userId: user.id,
         email: user.email,
       });
-
-      // Delete OTP after successful verification
-      await this.otpModel.deleteOne({ _id: otpRecord._id });
-      this.traceService.addCurrentEvent(
-        'Verification OTP deleted',
-      );
 
       // Generate access & refresh tokens
       const tokens = await this.generateTokens(
@@ -677,27 +695,8 @@ export class AuthV2Service {
         'User found',
       );
 
-      const otp = generateOtp();
-      const hashedOtp = await bcrypt.hash(otp, 10);
-      this.traceService.addCurrentEvent(
-        'Password reset OTP generated',
-      );
+      const otp = await this.issueOtp(user, OtpType.FORGOT_PASSWORD);
 
-      // Invalidate previous forgot password OTPs
-      await this.otpModel.deleteMany({
-        userId: user._id,
-        type: 'FORGOT_PASSWORD',
-      });
-      this.traceService.addCurrentEvent(
-        'Previous OTPs invalidated',
-      );
-
-      await this.otpModel.create({
-        otp: hashedOtp,
-        expiresAt: otpExpiry(this.configService.get('OTP_EXPIRY_TIME')), // Expires in 10 mins
-        userId: user._id,
-        type: 'FORGOT_PASSWORD',
-      });
       this.traceService.addCurrentEvent(
         'Password reset OTP stored',
       );
@@ -791,48 +790,7 @@ export class AuthV2Service {
 
       this.traceService.addCurrentEvent('User found');
 
-      const otpRecord = await this.otpModel.findOne({ userId: user._id, type });
-      if (!otpRecord) {
-        this.logger.warn('OTP verification failed - OTP not found', {
-          userId: user.id,
-          type,
-        });
-
-        this.traceService.addCurrentEvent('OTP not found');
-
-        throw new UnauthorizedException('OTP expired');
-      }
-
-      this.traceService.addCurrentEvent('OTP found');
-
-      if (otpRecord.expiresAt < new Date()) {
-        await this.otpModel.deleteOne({ _id: otpRecord._id });
-        this.logger.warn('OTP verification failed - OTP expired', {
-          userId: user.id,
-          type,
-        });
-
-        this.traceService.addCurrentEvent('OTP expired');
-
-        throw new UnauthorizedException('OTP expired');
-      }
-
-      const isValid = await bcrypt.compare(otp, otpRecord.otp);
-      if (!isValid) {
-        this.logger.warn('OTP verification failed - invalid OTP', {
-          userId: user.id,
-          type,
-        });
-
-        this.traceService.addCurrentEvent('Invalid OTP');
-
-        throw new UnauthorizedException('Invalid OTP');
-      }
-      this.traceService.addCurrentEvent('OTP validated');
-
-      await this.otpModel.deleteOne({ _id: otpRecord._id });
-
-      this.traceService.addCurrentEvent('OTP deleted');
+      await this.validateOtp(user, otp, type as OtpType);
 
       this.logger.info('OTP verified successfully', {
         userId: user.id,
@@ -910,26 +868,7 @@ export class AuthV2Service {
         throw new BadRequestException('Email already verified');
       }
 
-      const otp = generateOtp();
-      const hashedOtp = await bcrypt.hash(otp, 10);
-
-      this.traceService.addCurrentEvent(
-        'New OTP generated',
-      );
-
-      // Invalidate previous verification OTPs
-      await this.otpModel.deleteMany({ userId: user._id, type });
-
-      this.traceService.addCurrentEvent(
-        'Previous OTPs invalidated',
-      );
-
-      await this.otpModel.create({
-        otp: hashedOtp,
-        expiresAt: otpExpiry(this.configService.get('OTP_EXPIRY_TIME')), // e.g., 10 minutes
-        userId: user._id,
-        type,
-      });
+      const otp = await this.issueOtp(user, type as OtpType);
 
       this.traceService.addCurrentEvent(
         'New OTP stored',
@@ -1002,6 +941,7 @@ export class AuthV2Service {
   async resetPassword(
     email: string,
     newPassword: string,
+    otp: string,
   ): Promise<{ message: string }> {
     this.logger.info('Password reset requested', {
       email,
@@ -1034,6 +974,12 @@ export class AuthV2Service {
         'User found',
       );
 
+      await this.validateOtp(
+        user,
+        otp,
+        OtpType.FORGOT_PASSWORD,
+      );
+
       user.password = await bcrypt.hash(newPassword, 10);
       this.traceService.addCurrentEvent(
         'Password hashed',
@@ -1046,12 +992,6 @@ export class AuthV2Service {
       await user.save();
       this.traceService.addCurrentEvent(
         'User password updated',
-      );
-
-      await this.otpModel.deleteMany({ userId: user._id });
-
-      this.traceService.addCurrentEvent(
-        'User OTPs deleted',
       );
 
       this.logger.info('Password reset completed successfully', {
