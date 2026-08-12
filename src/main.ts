@@ -12,6 +12,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import type { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 import { PrometheusLoggerMiddleware } from './common/middlewares/prometheus_logger/prometheus_logger.middleware';
@@ -24,7 +25,6 @@ import {
 import * as fs from 'fs';
 import * as os from 'os';
 import { Logger } from 'nestjs-pino';
-import { apiReference } from '@scalar/nestjs-api-reference';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -108,7 +108,8 @@ async function bootstrap() {
     // )
     .addServer(
       process.env.NODE_ENV === 'production'
-        ? 'https://api.jobseeker.lemongautam.com.np'
+        // ? 'https://api.jobseeker.lemongautam.com.np'
+        ? 'https://jobseeker-backend-nestjs-phi.vercel.app'
         : 'http://localhost:7000',
       process.env.NODE_ENV === 'production'
         ? 'Production server'
@@ -141,18 +142,62 @@ async function bootstrap() {
   // });
 
   //* Scalar
-  app.use(
+  // app.use(
+  //   '/api/docs',
+  //   apiReference({
+  //     content: document,
+  //     theme: 'purple',
+  //     darkMode: true,
+  //     hideClientButton: false,
+  //     hideModels: false,
+  //     hideDownloadButton: false,
+  //     hideTestRequestButton: false,
+  //     showSidebar: true,
+  //   }),
+  // );
+
+  const expressApp = app.getHttpAdapter().getInstance();
+
+  // OpenAPI JSON
+  expressApp.get(
+    '/api/openapi.json',
+    (_req: Request, res: Response) => {
+      res.json(document);
+    },
+  );
+
+  // Scalar documentation
+  expressApp.get(
     '/api/docs',
-    apiReference({
-      content: document,
-      theme: 'purple',
-      darkMode: true,
-      hideClientButton: false,
-      hideModels: false,
-      hideDownloadButton: false,
-      hideTestRequestButton: false,
-      showSidebar: true,
-    }),
+    (_req: Request, res: Response) => {
+      res.type('html').send(`
+        <!doctype html>
+        <html>
+          <head>
+            <title>API Documentation</title>
+            <meta charset="utf-8" />
+            <meta
+              name="viewport"
+              content="width=device-width, initial-scale=1"
+            />
+          </head>
+
+          <body>
+            <div id="app"></div>
+
+            <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+
+            <script>
+              Scalar.createApiReference('#app', {
+                url: '/api/openapi.json',
+                theme: 'default',
+                pageTitle: 'API Documentation',
+              });
+            </script>
+          </body>
+        </html>
+      `);
+    },
   );
 
   app.useGlobalInterceptors(app.get(MetricsInterceptor));
