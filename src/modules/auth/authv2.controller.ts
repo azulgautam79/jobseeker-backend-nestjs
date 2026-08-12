@@ -363,7 +363,7 @@ export class AuthV2Controller {
   async resetPassword(
     @Body() dto: ResetPasswordDto,
   ): Promise<{ message: string }> {
-    return this.authV2Service.resetPassword(dto.email, dto.newPassword);
+    return this.authV2Service.resetPassword(dto.email, dto.newPassword, dto.otp);
   }
 
   /**

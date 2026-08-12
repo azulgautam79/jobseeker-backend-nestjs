@@ -13,6 +13,7 @@ import { RedisModule } from '../redis/redis.module';
 import { JobCacheService } from './job-cache.service';
 import { AppLoggerModule } from '../../common/logger/logger.module';
 import { TraceModule } from '../../common/telemetry/tracing/trace.module';
+import { PrometheusModule } from '../../common/prometheus/prometheus.module';
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { TraceModule } from '../../common/telemetry/tracing/trace.module';
     ]),
     RedisModule,
     AppLoggerModule,
-    TraceModule
+    TraceModule,
+    PrometheusModule
   ],
   controllers: [JobsController],
   providers: [JobsService, JobCacheService],

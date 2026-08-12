@@ -11,6 +11,7 @@ import { ContextLogger } from '../../common/logger/context-logger';
 import { LoggerFactory } from '../../common/logger/logger.factory';
 import { Trace } from '../../common/telemetry/tracing/trace.decorator';
 import { TraceService } from '../../common/telemetry/tracing/trace.service';
+import { PrometheusService } from '../../common/prometheus/prometheus.service';
 
 /**
  *! Saved Jobs Service
@@ -27,6 +28,7 @@ export class SavedJobsService {
     @InjectModel(Job.name)
     private readonly jobModel: Model<JobDocument>,
     private readonly traceService: TraceService,
+    private readonly prometheusService: PrometheusService,
     loggerFactory: LoggerFactory
   ) {
     this.logger =
@@ -77,7 +79,7 @@ export class SavedJobsService {
         job: jobId,
         jobseeker: userId,
       });
-
+      this.prometheusService.jobsSaved.labels('saved').inc();
       this.traceService.setCurrentAttributes({
         'savedJob.id': saved.id,
       });
@@ -142,7 +144,7 @@ export class SavedJobsService {
 
         throw new NotFoundException('Saved job not found');
       }
-
+      this.prometheusService.jobsSaved.labels('unsaved').inc();
       this.traceService.setCurrentAttributes({
         'savedJob.id': deleted.id
       });

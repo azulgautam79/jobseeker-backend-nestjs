@@ -7,6 +7,6 @@ import { MailService } from '../../modules/mail/mail.service';
 @Module({
   providers: [PrometheusService, MetricsInterceptor, MailService],
   controllers: [PrometheusController],
-  exports: [MetricsInterceptor],
+  exports: [MetricsInterceptor, PrometheusService],
 })
 export class PrometheusModule {}

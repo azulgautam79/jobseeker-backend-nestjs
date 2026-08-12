@@ -87,12 +87,6 @@ export class User {
   @Prop({ default: false })
   isEmailVerified!: boolean;
 
-  // @Prop()
-  // emailOtp?: string;
-
-  // @Prop()
-  // emailOtpExpiresAt?: Date;
-
   @ApiProperty({
     example: 'janedone.jpg',
     description: 'Provide the avatar of the User',

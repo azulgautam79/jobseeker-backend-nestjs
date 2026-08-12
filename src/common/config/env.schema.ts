@@ -22,7 +22,7 @@ export const envSchema = Joi.object({
   REFRESH_TOKEN_TIME: Joi.string().required(),
   REFRESH_TOKEN_REMEMBER_TIME: Joi.string().required(),
 
-  OTP_EXPIRY_TIME: Joi.number().required(),
+  OTP_EXPIRY_TIME: Joi.string().required(),
 
   SMTP_HOST: Joi.string().required(),
   SMTP_PORT: Joi.number().default(587),

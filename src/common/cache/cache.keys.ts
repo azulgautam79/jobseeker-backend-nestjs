@@ -1,5 +1,7 @@
 // src/common/cache/cache.keys.ts
 
+import { OtpType } from "../enums/otpType";
+
 export const CacheKeys = {
   jobs: () => 'jobs',
 
@@ -18,6 +20,23 @@ export const CacheKeys = {
   },
 
   jobApplicants(jobId: string) {
-    return `applications:user:${jobId}`
+    return `applications:job:${jobId}`
+  },
+
+  //! Otp Keys
+  otp(userId: string, type: OtpType) {
+    return `otp:${type}:${userId}`
+  },
+
+  refresh(userId: string) {
+    return `refresh:${userId}`
+  },
+
+  profile(userId: string) {
+    return `profile:${userId}`
+  },
+
+  analytics(companyId: string) {
+    return `analytics:${companyId}`
   }
 };
