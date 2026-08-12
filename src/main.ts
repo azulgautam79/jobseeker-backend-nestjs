@@ -24,6 +24,7 @@ import {
 import * as fs from 'fs';
 import * as os from 'os';
 import { Logger } from 'nestjs-pino';
+import { apiReference } from '@scalar/nestjs-api-reference';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -116,27 +117,43 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      tagsSorter: 'alpha',
-      operationsSorter: 'alpha',
-    },
-    customSiteTitle: 'API Documentation',
-    // customfavIcon: 'https://www.lemongautam.com.np/logo.svg',
-    customfavIcon: 'https://i.imgur.com/Bk96b3D.png',
+  //* Swagger UI 
+  // SwaggerModule.setup('api/docs', app, document, {
+  //   swaggerOptions: {
+  //     persistAuthorization: true,
+  //     tagsSorter: 'alpha',
+  //     operationsSorter: 'alpha',
+  //   },
+  //   customSiteTitle: 'API Documentation',
+  //   // customfavIcon: 'https://www.lemongautam.com.np/logo.svg',
+  //   customfavIcon: 'https://i.imgur.com/Bk96b3D.png',
 
-    customCss: `
-      .swagger-ui .topbar {display: none}
-      .swagger-ui .info { margin: 50px 0; }
-      .swagger-ui .info .title {color: #4A90E2;}
-    `,
-    customCssUrl: 'https://unpkg.com/swagger-ui-dist/swagger-ui.css',
-    customJs: [
-      'https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js',
-      'https://unpkg.com/swagger-ui-dist/swagger-ui-standalone-preset.js',
-    ],
-  });
+  //   customCss: `
+  //     .swagger-ui .topbar {display: none}
+  //     .swagger-ui .info { margin: 50px 0; }
+  //     .swagger-ui .info .title {color: #4A90E2;}
+  //   `,
+  //   customCssUrl: 'https://unpkg.com/swagger-ui-dist/swagger-ui.css',
+  //   customJs: [
+  //     'https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js',
+  //     'https://unpkg.com/swagger-ui-dist/swagger-ui-standalone-preset.js',
+  //   ],
+  // });
+
+  //* Scalar
+  app.use(
+    '/api/docs',
+    apiReference({
+      content: document,
+      theme: 'purple',
+      darkMode: true,
+      hideClientButton: false,
+      hideModels: false,
+      hideDownloadButton: false,
+      hideTestRequestButton: false,
+      showSidebar: true,
+    }),
+  );
 
   app.useGlobalInterceptors(app.get(MetricsInterceptor));
 
